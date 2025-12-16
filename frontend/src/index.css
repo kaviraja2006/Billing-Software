@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+:root {
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+  /* Color System - Light Theme (POS Style) */
+  --color-bg-primary: #F8FAFC;
+  /* Slate 50 */
+  --color-bg-secondary: #FFFFFF;
+  --color-border: #E2E8F0;
+  /* Slate 200 */
+
+  --color-text-primary: #0F172A;
+  /* Slate 900 */
+  --color-text-secondary: #64748B;
+  /* Slate 500 */
+
+  --color-accent: #3B82F6;
+  /* Blue 500 */
+  --color-accent-hover: #2563EB;
+  /* Blue 600 */
+  --color-accent-foreground: #FFFFFF;
+
+  --color-success: #10B981;
+  --color-warning: #F59E0B;
+  --color-danger: #EF4444;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom Utilities for Scrollbars */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
