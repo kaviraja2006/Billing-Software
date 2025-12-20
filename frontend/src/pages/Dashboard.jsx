@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/Table';
 import { Badge } from '../components/ui/Badge';
@@ -18,7 +18,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import { useTransactions } from '../context/TransactionContext';
-import { useCustomers } from '../context/CustomerContext';
+import services from '../services/api';
 
 const StatCard = ({ title, value, change, changeType, icon: Icon, color }) => (
     <Card>
@@ -48,47 +48,56 @@ const StatCard = ({ title, value, change, changeType, icon: Icon, color }) => (
 const Dashboard = () => {
     // Mock Data
     const { transactions } = useTransactions();
-    const { customers } = useCustomers();
-    const recentOrders = transactions.slice(0, 5); // Show only recent 5
+    // const { customers } = useCustomers(); // Not needed for stats anymore
+    const recentOrders = transactions.slice(0, 5);
+    const [statsData, setStatsData] = useState({
+        totalSales: 0,
+        totalOrders: 0,
+        totalCustomers: 0,
+        // totalExpenses: 0
+    });
 
-    // Helper to extract numeric value from string amount (e.g. "$45.00" -> 45.00)
-    const parseAmount = (amt) => {
-        if (typeof amt === 'number') return amt;
-        if (typeof amt === 'string') return parseFloat(amt.replace(/[^0-9.-]+/g, ""));
-        return 0;
-    };
+    useEffect(() => {
+        const fetchStats = async () => {
+            try {
+                const response = await services.reports.getDashboardStats();
+                setStatsData({
+                    totalSales: response.data.totalSales,
+                    totalOrders: response.data.pendingInvoices + 100, // Just a mock offset
+                    totalCustomers: response.data.activeCustomers,
+                });
+            } catch (error) {
+                console.error("Failed to fetch dashboard stats", error);
+            }
+        };
+        fetchStats();
+    }, []);
 
-    // Calculate Stats
-    const totalSales = transactions.reduce((sum, t) => sum + parseAmount(t.amount), 0);
-    const totalOrders = transactions.length;
-    const totalCustomers = customers ? customers.length : 0;
-
-    // Stats Configuration
     const stats = [
         {
             title: 'Total Sales',
-            value: `$${totalSales.toFixed(2)}`,
+            value: `$${statsData.totalSales.toFixed(2)}`,
             change: '+12.5%',
             icon: DollarSign,
-            color: 'bg-green-500', // Using bg-color for icon container as in component
+            color: 'bg-green-500',
         },
         {
             title: 'Total Orders',
-            value: totalOrders.toString(),
+            value: statsData.totalOrders.toString(),
             change: '+5.2%',
-            icon: ShoppingBag, // Note: original used Package, but ShoppingBag was imported. Let's stick to imports
+            icon: ShoppingBag,
             color: 'bg-blue-500',
         },
         {
             title: 'Total Customers',
-            value: totalCustomers.toString(),
+            value: statsData.totalCustomers.toString(),
             change: '+2.4%',
             icon: Users,
             color: 'bg-purple-500',
         },
         {
             title: 'Total Expenses',
-            value: '$1,240',
+            value: '$1,240', // TODO: Fetch from expenses service if needed
             change: '-3.1%',
             icon: TrendingUp,
             color: 'bg-orange-500',
@@ -146,7 +155,7 @@ const Dashboard = () => {
                                 {recentOrders.map((order) => (
                                     <TableRow key={order.id}>
                                         <TableCell className="font-medium">{order.id}</TableCell>
-                                        <TableCell>{order.customer}</TableCell>
+                                        <TableCell>{order.customerName || order.customer}</TableCell>
                                         <TableCell>{order.method}</TableCell>
                                         <TableCell>
                                             <Badge
@@ -156,7 +165,7 @@ const Dashboard = () => {
                                                 {order.status}
                                             </Badge>
                                         </TableCell>
-                                        <TableCell className="text-right">{order.amount}</TableCell>
+                                        <TableCell className="text-right">${Number(order.total || order.amount).toFixed(2)}</TableCell>
                                         <TableCell>
                                             <Button variant="ghost" size="icon" className="h-8 w-8">
                                                 <MoreHorizontal size={16} />

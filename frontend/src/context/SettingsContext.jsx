@@ -1,4 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
+import services from '../services/api';
 
 const SettingsContext = createContext();
 
@@ -49,56 +50,93 @@ export const SettingsProvider = ({ children }) => {
         }
     };
 
-    const [settings, setSettings] = useState(() => {
-        const saved = localStorage.getItem('app_settings');
-        return saved ? JSON.parse(saved) : defaultSettings;
-    });
+    const [settings, setSettings] = useState(defaultSettings);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        localStorage.setItem('app_settings', JSON.stringify(settings));
-    }, [settings]);
+        const fetchSettings = async () => {
+            try {
+                const response = await services.settings.getSettings();
+                // Merge with defaults to ensure all fields exist
+                setSettings(prev => ({ ...prev, ...response.data }));
+            } catch (error) {
+                console.error("Failed to fetch settings", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchSettings();
+    }, []);
+
+    const saveSettings = async (newSettings) => {
+        try {
+            await services.settings.updateSettings(newSettings);
+        } catch (error) {
+            console.error("Failed to save settings", error);
+        }
+    };
 
     const updateSettings = (section, data) => {
-        setSettings(prev => ({
-            ...prev,
-            [section]: {
-                ...prev[section],
-                ...data
-            }
-        }));
+        setSettings(prev => {
+            const next = {
+                ...prev,
+                [section]: {
+                    ...prev[section],
+                    ...data
+                }
+            };
+            saveSettings(next);
+            return next;
+        });
     };
 
     const updateTaxSlab = (id, updates) => {
-        setSettings(prev => ({
-            ...prev,
-            tax: {
-                ...prev.tax,
-                slabs: prev.tax.slabs.map(slab =>
-                    slab.id === id ? { ...slab, ...updates } : slab
-                )
-            }
-        }));
+        setSettings(prev => {
+            const next = {
+                ...prev,
+                tax: {
+                    ...prev.tax,
+                    slabs: prev.tax.slabs.map(slab =>
+                        slab.id === id ? { ...slab, ...updates } : slab
+                    )
+                }
+            };
+            saveSettings(next);
+            return next;
+        });
     };
 
     const addTaxSlab = (newSlab) => {
-        setSettings(prev => ({
-            ...prev,
-            tax: {
-                ...prev.tax,
-                slabs: [...prev.tax.slabs, { ...newSlab, id: `gst-${Date.now()}` }]
-            }
-        }));
+        setSettings(prev => {
+            const next = {
+                ...prev,
+                tax: {
+                    ...prev.tax,
+                    slabs: [...prev.tax.slabs, { ...newSlab, id: `gst-${Date.now()}` }]
+                }
+            };
+            saveSettings(next);
+            return next;
+        });
     };
 
     const resetSlabs = () => {
-        setSettings(prev => ({
-            ...prev,
-            tax: {
-                ...prev.tax,
-                slabs: defaultSettings.tax.slabs
-            }
-        }));
+        setSettings(prev => {
+            const next = {
+                ...prev,
+                tax: {
+                    ...prev.tax,
+                    slabs: defaultSettings.tax.slabs
+                }
+            };
+            saveSettings(next);
+            return next;
+        });
     };
+
+    if (loading) {
+        return <div className="p-10 text-center text-slate-500">Loading settings...</div>;
+    }
 
     return (
         <SettingsContext.Provider value={{

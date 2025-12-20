@@ -4,15 +4,24 @@ import { Input } from '../../components/ui/Input';
 import { Card } from '../../components/ui/Card';
 import { Printer, Copy } from 'lucide-react';
 import Barcode from 'react-barcode';
+import { useProducts } from '../../context/ProductContext';
 
 
 const BarcodeGeneratorPage = () => {
+    const { products } = useProducts();
     const [inputValue, setInputValue] = useState('PROD-101');
     const [barcodeValue, setBarcodeValue] = useState('PROD-101');
 
-
     const generateBarcode = () => {
         setBarcodeValue(inputValue);
+    };
+
+    const handleProductSelect = (e) => {
+        const prod = products.find(p => p.id === e.target.value);
+        if (prod) {
+            setInputValue(prod.barcode || prod.id); // Use barcode if exists, else ID
+            setBarcodeValue(prod.barcode || prod.id);
+        }
     };
 
     const handlePrint = () => {
@@ -53,14 +62,30 @@ const BarcodeGeneratorPage = () => {
             <p className="text-slate-500">Generate printable barcodes for your products inventory.</p>
 
             <Card className="p-8">
-                <div className="flex gap-4 max-w-md mx-auto mb-8">
-                    <Input
-                        value={inputValue}
-                        onChange={(e) => setInputValue(e.target.value)}
-                        placeholder="Enter Product Code / SKU"
-                        className="text-lg font-mono uppercase"
-                    />
-                    <Button onClick={generateBarcode} className="bg-blue-600">Generate</Button>
+                <div className="flex flex-col gap-4 max-w-md mx-auto mb-8 text-left">
+                    <div>
+                        <label className="text-sm font-medium text-slate-700 mb-1 block">Select Product (Optional)</label>
+                        <select
+                            className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                            onChange={handleProductSelect}
+                            defaultValue=""
+                        >
+                            <option value="" disabled>Select a product...</option>
+                            {products.map(p => (
+                                <option key={p.id} value={p.id}>{p.name} ({p.barcode || 'No Barcode'})</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="flex gap-2">
+                        <Input
+                            value={inputValue}
+                            onChange={(e) => setInputValue(e.target.value)}
+                            placeholder="Enter Product Code / SKU"
+                            className="text-lg font-mono uppercase"
+                        />
+                        <Button onClick={generateBarcode} className="bg-blue-600">Generate</Button>
+                    </div>
                 </div>
 
                 <div className="space-y-6">

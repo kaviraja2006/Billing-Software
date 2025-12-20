@@ -119,31 +119,35 @@ const BillingPage = () => {
                         {currentStep === 4 && <PaymentStep billingData={billingData} />}
                     </div>
 
-                    {/* Footer Actions */}
-                    <div className="border-t border-slate-100 bg-white p-4 flex justify-between items-center">
-                        <Button
-                            variant="outline"
-                            onClick={prevStep}
-                            disabled={currentStep === 1}
-                            className="w-32"
-                        >
-                            <ChevronLeft className="mr-2 h-4 w-4" /> Back
-                        </Button>
-
-                        {currentStep < steps.length ? (
+                    {/* Footer Actions - Hide on Payment Step (4) as it has its own controls */}
+                    {currentStep !== 4 && (
+                        <div className="border-t border-slate-100 bg-white p-4 flex justify-between items-center">
                             <Button
-                                onClick={nextStep}
+                                variant="outline"
+                                onClick={prevStep}
+                                disabled={currentStep === 1}
                                 className="w-32"
-                                disabled={currentStep === 1 && !billingData.customer} // Require customer selection
                             >
-                                Next <ChevronRight className="ml-2 h-4 w-4" />
+                                <ChevronLeft className="mr-2 h-4 w-4" /> Back
                             </Button>
-                        ) : (
-                            <Button className="w-40 bg-green-600 hover:bg-green-700">
-                                Complete Sale
-                            </Button>
-                        )}
-                    </div>
+
+                            {currentStep < steps.length ? (
+                                <Button
+                                    onClick={nextStep}
+                                    className="w-32"
+                                    disabled={currentStep === 1 && !billingData.customer} // Require customer selection
+                                >
+                                    Next <ChevronRight className="ml-2 h-4 w-4" />
+                                </Button>
+                            ) : (
+                                /* This "Complete Sale" button was dead/unused. 
+                                   Since we hide the footer on step 4, this is effectively removed, 
+                                   but we keep the logic structure clean.
+                                */
+                                null
+                            )}
+                        </div>
+                    )}
                 </Card>
             </div>
 

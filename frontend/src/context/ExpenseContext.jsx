@@ -1,4 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
+import services from '../services/api';
 
 const ExpenseContext = createContext();
 
@@ -11,35 +12,43 @@ export const useExpenses = () => {
 };
 
 export const ExpenseProvider = ({ children }) => {
-    const defaultExpenses = [
-        { id: 1, title: 'Store Rent - Oct', category: 'Rent', amount: 1200.00, date: '2023-10-01', notes: 'Monthly rent payment' },
-        { id: 2, title: 'Electricity Bill', category: 'Utilities', amount: 145.50, date: '2023-10-05', notes: 'Sept cycle' },
-        { id: 3, title: 'Internet Service', category: 'Utilities', amount: 89.99, date: '2023-10-05', notes: 'Fiber connection' },
-        { id: 4, title: 'Office Supplies', category: 'Supplies', amount: 45.00, date: '2023-10-10', notes: 'Paper, pens, staples' },
-        { id: 5, title: 'Staff Lunch', category: 'Food', amount: 120.00, date: '2023-10-12', notes: 'Team meeting lunch' },
-    ];
-
-    const [expenses, setExpenses] = useState(() => {
-        const saved = localStorage.getItem('expenses');
-        return saved ? JSON.parse(saved) : defaultExpenses;
-    });
+    const [expenses, setExpenses] = useState([]);
 
     useEffect(() => {
-        localStorage.setItem('expenses', JSON.stringify(expenses));
-    }, [expenses]);
-
-    const addExpense = (expenseData) => {
-        const newExpense = {
-            id: Date.now(),
-            ...expenseData,
-            amount: parseFloat(expenseData.amount) || 0
+        const fetchExpenses = async () => {
+            try {
+                const response = await services.expenses.getAll();
+                setExpenses(response.data);
+            } catch (error) {
+                console.error("Failed to fetch expenses", error);
+            }
         };
-        setExpenses(prev => [newExpense, ...prev]);
-        return newExpense;
+        fetchExpenses();
+    }, []);
+
+    const addExpense = async (expenseData) => {
+        try {
+            const response = await services.expenses.create({
+                ...expenseData,
+                amount: parseFloat(expenseData.amount) || 0
+            });
+            const newExpense = response.data;
+            setExpenses(prev => [newExpense, ...prev]);
+            return newExpense;
+        } catch (error) {
+            console.error("Failed to add expense", error);
+            throw error;
+        }
     };
 
-    const deleteExpense = (id) => {
-        setExpenses(prev => prev.filter(e => e.id !== id));
+    const deleteExpense = async (id) => {
+        try {
+            await services.expenses.delete(id);
+            setExpenses(prev => prev.filter(e => e.id !== id));
+        } catch (error) {
+            console.error("Failed to delete expense", error);
+            throw error;
+        }
     };
 
     const stats = {

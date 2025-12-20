@@ -1,84 +1,53 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Calendar, Download, TrendingUp, TrendingDown, FileText, CreditCard, DollarSign, Wallet } from 'lucide-react';
-import { useTransactions } from '../../context/TransactionContext';
-import { useExpenses } from '../../context/ExpenseContext';
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell, Legend
 } from 'recharts';
+import services from '../../services/api';
 
 const ReportsPage = () => {
-    const { transactions } = useTransactions();
-    const { expenses } = useExpenses();
+    const [stats, setStats] = useState({
+        totalSales: 0,
+        totalOrders: 0,
+        avgOrderValue: 0,
+        totalExpenses: 0,
+        netProfit: 0,
+        salesTrend: [],
+        paymentMethods: [],
+        topProducts: []
+    });
+    const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('sales');
 
-    // --- Calculations ---
-    const stats = useMemo(() => {
-        // 1. Sales
-        const totalSales = transactions.reduce((sum, t) => sum + parseFloat(t.amount.replace(/[^0-9.-]+/g, "")), 0);
-        const totalOrders = transactions.length;
-        const avgOrderValue = totalOrders > 0 ? totalSales / totalOrders : 0;
+    useEffect(() => {
+        const fetchReportData = async () => {
+            setLoading(true);
+            try {
+                const [financials, trend, methods, products] = await Promise.all([
+                    services.reports.getFinancialStats(),
+                    services.reports.getSalesTrend(),
+                    services.reports.getPaymentMethodStats(),
+                    services.reports.getTopProducts()
+                ]);
 
-        // 2. Expenses
-        const totalExpenses = expenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
-
-        // 3. Profit
-        const netProfit = totalSales - totalExpenses;
-
-        // Sales Trend (Last 7 Days)
-        const last7Days = [...Array(7)].map((_, i) => {
-            const d = new Date();
-            d.setDate(d.getDate() - i);
-            return d.toISOString().split('T')[0];
-        }).reverse();
-
-        const salesTrend = last7Days.map(date => {
-            const daySales = transactions
-                .filter(t => t.date === date)
-                .reduce((sum, t) => sum + parseFloat(t.amount.replace(/[^0-9.-]+/g, "")), 0);
-            return { date: date.slice(5), sales: daySales }; // slice to show MM-DD
-        });
-
-        // Payment Method Distribution
-        const methods = {};
-        transactions.forEach(t => {
-            methods[t.method] = (methods[t.method] || 0) + 1;
-        });
-        const paymentMethods = Object.keys(methods).map(key => ({
-            name: key,
-            value: methods[key]
-        }));
-
-        // Top Products
-        const productMap = {};
-        transactions.forEach(t => {
-            if (t.items && Array.isArray(t.items)) {
-                t.items.forEach(item => {
-                    if (!productMap[item.name]) {
-                        productMap[item.name] = { name: item.name, quantity: 0, revenue: 0 };
-                    }
-                    productMap[item.name].quantity += item.quantity;
-                    productMap[item.name].revenue += item.price * item.quantity;
+                setStats({
+                    ...financials.data,
+                    salesTrend: trend.data,
+                    paymentMethods: methods.data,
+                    topProducts: products.data
                 });
+            } catch (error) {
+                console.error("Failed to fetch report data", error);
+            } finally {
+                setLoading(false);
             }
-        });
-        const topProducts = Object.values(productMap)
-            .sort((a, b) => b.quantity - a.quantity)
-            .slice(0, 5);
-
-        return {
-            totalSales,
-            totalOrders,
-            avgOrderValue,
-            totalExpenses,
-            netProfit,
-            salesTrend,
-            paymentMethods,
-            topProducts
         };
-    }, [transactions, expenses]);
+
+        fetchReportData();
+    }, []);
 
     const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 

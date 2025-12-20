@@ -1,4 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
+import services from '../services/api';
 
 const AuthContext = createContext();
 
@@ -15,49 +16,55 @@ export const AuthProvider = ({ children }) => {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        // Check local storage for existing session
-        const storedUser = localStorage.getItem('user');
-        if (storedUser) {
-            setUser(JSON.parse(storedUser));
-        }
-        setIsLoading(false);
+        const initAuth = async () => {
+            try {
+                // Check if we have a token and try to get current user
+                const token = localStorage.getItem('token');
+                if (token) {
+                    const response = await services.auth.getCurrentUser();
+                    setUser(response.data);
+                } else {
+                    const storedUser = localStorage.getItem('user');
+                    if (storedUser) {
+                        setUser(JSON.parse(storedUser));
+                    }
+                }
+            } catch (error) {
+                console.error("Auth init error:", error);
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        initAuth();
     }, []);
 
-    const login = (email, password) => {
-        // Mock Login Logic
-        return new Promise((resolve, reject) => {
-            setTimeout(() => {
-                if (password === 'password') { // Simple mock password
-                    let role = 'cashier';
-                    let name = 'Cashier User';
+    const login = async (email, password) => {
+        try {
+            const response = await services.auth.login({ email, password });
+            const { user, token } = response.data;
 
-                    if (email.toLowerCase().includes('admin')) {
-                        role = 'admin';
-                        name = 'Admin User';
-                    }
+            setUser(user);
+            // Storage is handled in mock service for simplicity, but we can double check
+            if (!localStorage.getItem('token')) localStorage.setItem('token', token);
+            if (!localStorage.getItem('user')) localStorage.setItem('user', JSON.stringify(user));
 
-                    const userData = {
-                        id: Date.now(),
-                        name,
-                        email,
-                        role,
-                        avatar: `https://ui-avatars.com/api/?name=${name}&background=random`
-                    };
-
-                    setUser(userData);
-                    localStorage.setItem('user', JSON.stringify(userData));
-                    resolve(userData);
-                } else {
-                    reject('Invalid credentials (try password: "password")');
-                }
-            }, 800);
-        });
+            return user;
+        } catch (error) {
+            throw error.response?.data?.message || 'Login failed';
+        }
     };
 
-    const logout = () => {
-        setUser(null);
-        localStorage.removeItem('user');
-        window.location.href = '/login'; // Force redirect
+    const logout = async () => {
+        try {
+            await services.auth.logout();
+            setUser(null);
+            // Redirect is handled in component or Router, but we can force it here if strictly needed
+            // window.location.href = '/login'; 
+        } catch (error) {
+            console.error("Logout error", error);
+        }
     };
 
     return (

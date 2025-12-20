@@ -4,13 +4,13 @@ import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/Table';
 import { Badge } from '../../components/ui/Badge';
-import { Search, Filter, Eye, Download } from 'lucide-react';
+import { Search, Filter, Eye, Download, Trash2 } from 'lucide-react';
 import { useTransactions } from '../../context/TransactionContext';
 import InvoiceDetailsModal from './InvoiceDetailsModal';
 import { utils, writeFile } from 'xlsx';
 
 const InvoicesPage = () => {
-    const { transactions } = useTransactions();
+    const { transactions, deleteTransaction } = useTransactions();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -24,6 +24,16 @@ const InvoicesPage = () => {
     const handleViewInvoice = (invoice) => {
         setSelectedInvoice(invoice);
         setIsModalOpen(true);
+    };
+
+    const handleDelete = async (id) => {
+        if (window.confirm('Are you sure you want to delete this invoice?')) {
+            try {
+                await deleteTransaction(id);
+            } catch (error) {
+                alert('Failed to delete invoice');
+            }
+        }
     };
 
     const handleExport = () => {
@@ -110,6 +120,14 @@ const InvoicesPage = () => {
                                                 className="h-8 w-8 p-0"
                                             >
                                                 <Eye className="h-4 w-4 text-slate-500 hover:text-blue-600" />
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => handleDelete(invoice.id)}
+                                                className="h-8 w-8 p-0"
+                                            >
+                                                <Trash2 className="h-4 w-4 text-slate-500 hover:text-red-600" />
                                             </Button>
                                         </TableCell>
                                     </TableRow>

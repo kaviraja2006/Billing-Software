@@ -57,8 +57,8 @@ export const printReceipt = (invoice) => {
                 <div class="meta">
                     <div><strong>Invoice: ${invoice.id}</strong></div>
                     <div>Date: ${invoice.date || new Date().toLocaleDateString()}</div>
-                    <div>Customer: ${invoice.customer || 'Walk-in'}</div>
-                    <div>Method: ${invoice.method || 'Cash'}</div>
+                    <div>Customer: ${invoice.customerName || invoice.customer || 'Walk-in'}</div>
+                    <div>Method: ${invoice.paymentMethod || invoice.method || 'Cash'}</div>
                 </div>
 
                 <table>

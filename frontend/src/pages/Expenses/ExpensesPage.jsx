@@ -70,7 +70,11 @@ const ExpensesPage = () => {
                                 <TableCell className="text-slate-500 truncate max-w-[200px]">{expense.notes}</TableCell>
                                 <TableCell className="text-right font-bold text-red-600">-${expense.amount.toFixed(2)}</TableCell>
                                 <TableCell>
-                                    <Button variant="ghost" size="sm" onClick={() => deleteExpense(expense.id)} className="text-slate-400 hover:text-red-500">
+                                    <Button variant="ghost" size="sm" onClick={async () => {
+                                        if (window.confirm('Delete this expense?')) {
+                                            try { await deleteExpense(expense.id); } catch (e) { alert('Failed to delete'); }
+                                        }
+                                    }} className="text-slate-400 hover:text-red-500">
                                         Delete
                                     </Button>
                                 </TableCell>
