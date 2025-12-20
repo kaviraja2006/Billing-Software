@@ -19,18 +19,22 @@ const ExpenseModal = ({ isOpen, onClose }) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         if (!formData.title || !formData.amount) return;
-        addExpense(formData);
-        onClose();
-        // Reset form
-        setFormData({
-            title: '',
-            amount: '',
-            category: '',
-            date: new Date().toISOString().split('T')[0],
-            notes: ''
-        });
+        try {
+            await addExpense(formData);
+            onClose();
+            // Reset form
+            setFormData({
+                title: '',
+                amount: '',
+                category: '',
+                date: new Date().toISOString().split('T')[0],
+                notes: ''
+            });
+        } catch (error) {
+            alert('Failed to save expense');
+        }
     };
 
     return (

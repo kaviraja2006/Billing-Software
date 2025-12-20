@@ -16,6 +16,7 @@ const PaymentStep = ({ billingData, onComplete }) => {
     const { customers, updateCustomer } = useCustomers();
     const { updateStock } = useProducts();
     const [method, setMethod] = useState('cash'); // cash, card, upi, split
+    const [splitCash, setSplitCash] = useState('');
     const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
     const [currentInvoice, setCurrentInvoice] = useState(null);
     const totalAmount = billingData.totals?.total || 0;
@@ -23,42 +24,65 @@ const PaymentStep = ({ billingData, onComplete }) => {
     // Mock processing state
     const [isProcessing, setIsProcessing] = useState(false);
 
-    const handlePayment = () => {
+    const handlePayment = async () => {
         setIsProcessing(true);
-        // Simulate API call
-        setTimeout(() => {
-            const newInvoice = addTransaction({
-                customer: billingData.customer?.name || 'Walk-in Customer',
-                amount: `$${totalAmount.toFixed(2)}`,
-                method: method.charAt(0).toUpperCase() + method.slice(1),
-                items: billingData.cart,
-                subtotal: billingData.totals.subtotal,
-                tax: billingData.totals.tax,
-                discount: billingData.totals.discount
-            });
+        try {
+            // Prepare payload matching backend schema
+            let methodStr = method.charAt(0).toUpperCase() + method.slice(1);
+            if (method === 'split') {
+                const cash = parseFloat(splitCash) || 0;
+                const online = totalAmount - cash;
+                methodStr = `Split (Cash: ${cash.toFixed(2)}, Online: ${online.toFixed(2)})`;
+            }
 
-            // Update Customer Stats if registered
+            const invoiceData = {
+                customerId: billingData.customer?.id || '',
+                customerName: billingData.customer?.name || 'Walk-in Customer',
+                date: new Date(),
+                paymentMethod: methodStr,
+                items: billingData.cart.map(item => ({
+                    productId: item.id,
+                    name: item.name,
+                    quantity: Number(item.quantity),
+                    price: Number(item.price),
+                    total: Number(item.price) * Number(item.quantity)
+                })),
+                subtotal: Number(billingData.totals.subtotal),
+                tax: Number(billingData.totals.tax),
+                discount: Number(billingData.totals.discount),
+                total: Number(totalAmount)
+            };
+
+            // 1. Create Invoice/Transaction
+            const newInvoice = await addTransaction(invoiceData);
+
+            // 2. Update Customer Stats if registered
             if (billingData.customer && billingData.customer.id) {
                 const currentCustomer = customers.find(c => c.id === billingData.customer.id);
                 if (currentCustomer) {
-                    updateCustomer(currentCustomer.id, {
+                    await updateCustomer(currentCustomer.id, {
                         totalVisits: (currentCustomer.totalVisits || 0) + 1,
                         totalSpent: (currentCustomer.totalSpent || 0) + totalAmount
                     });
                 }
             }
 
-            // Update Inventory (Deduct Stock)
+            // 3. Update Inventory (Deduct Stock)
             if (billingData.cart && billingData.cart.length > 0) {
-                billingData.cart.forEach(item => {
-                    updateStock(item.id, -item.quantity);
-                });
+                // Execute all stock updates in parallel
+                await Promise.all(billingData.cart.map(item =>
+                    updateStock(item.id, -item.quantity)
+                ));
             }
 
             setCurrentInvoice(newInvoice);
-            setIsProcessing(false);
             setIsSuccessModalOpen(true);
-        }, 1500);
+        } catch (error) {
+            console.error("Payment failed", error);
+            alert("Payment processing failed. Please try again.");
+        } finally {
+            setIsProcessing(false);
+        }
     };
 
     const handlePrint = () => {
@@ -136,8 +160,26 @@ const PaymentStep = ({ billingData, onComplete }) => {
                 )}
 
                 {method === 'split' && (
-                    <div className="text-center text-slate-500 py-4">
-                        Split payment logic would go here (e.g. $50 Cash, Rest Card)
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-center text-sm font-medium">
+                            <span className="flex items-center gap-2"><Banknote size={16} /> Cash Amount</span>
+                            <Input
+                                className="w-40 text-right"
+                                type="number"
+                                min="0"
+                                max={totalAmount}
+                                placeholder="0.00"
+                                value={splitCash}
+                                onChange={(e) => setSplitCash(e.target.value)}
+                            />
+                        </div>
+                        <div className="flex justify-between items-center text-sm font-medium text-slate-600">
+                            <span className="flex items-center gap-2"><CreditCard size={16} /> Card/Online Amount</span>
+                            <span className="font-bold text-slate-900">${(totalAmount - (parseFloat(splitCash) || 0)).toFixed(2)}</span>
+                        </div>
+                        {(parseFloat(splitCash) || 0) > totalAmount && (
+                            <p className="text-red-500 text-xs text-center">Cash amount cannot exceed total.</p>
+                        )}
                     </div>
                 )}
             </Card>
@@ -168,7 +210,7 @@ const PaymentStep = ({ billingData, onComplete }) => {
 
                     <div className="flex flex-col gap-2 pt-4">
                         <Button className="w-full" onClick={handlePrint}>Print Invoice</Button>
-                        <Button variant="outline" className="w-full" onClick={() => window.location.href = '/'}>Back to Dashboard</Button>
+                        <Button variant="outline" className="w-full" onClick={() => window.location.reload()}>New Sale (Reset)</Button>
                     </div>
                 </div>
             </Modal>

@@ -2,12 +2,12 @@ import React, { useState } from 'react';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/Table';
-import { Search, UserPlus, Filter, Edit, Eye, Phone, Mail } from 'lucide-react';
+import { Search, UserPlus, Filter, Edit, Eye, Phone, Mail, Trash2 } from 'lucide-react';
 import CustomerDrawer from './CustomerDrawer';
 import { useCustomers } from '../../context/CustomerContext';
 
 const CustomersPage = () => {
-    const { customers, addCustomer, updateCustomer } = useCustomers();
+    const { customers, addCustomer, updateCustomer, deleteCustomer, loading } = useCustomers();
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const [selectedCustomer, setSelectedCustomer] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
@@ -28,14 +28,32 @@ const CustomersPage = () => {
         setIsDrawerOpen(true);
     };
 
-    const handleSaveCustomer = (customerData) => {
-        if (selectedCustomer) {
-            updateCustomer(selectedCustomer.id, customerData);
-        } else {
-            addCustomer(customerData);
+    const handleSaveCustomer = async (customerData) => {
+        try {
+            if (selectedCustomer) {
+                await updateCustomer(selectedCustomer.id, customerData);
+            } else {
+                await addCustomer(customerData);
+            }
+            setIsDrawerOpen(false);
+        } catch (error) {
+            alert('Failed to save customer');
         }
-        setIsDrawerOpen(false);
     };
+
+    const handleDelete = async (id) => {
+        if (window.confirm('Are you sure you want to delete this customer?')) {
+            try {
+                await deleteCustomer(id);
+            } catch (error) {
+                alert('Failed to delete customer');
+            }
+        }
+    };
+
+    if (loading) {
+        return <div className="p-10 text-center text-slate-500">Loading customers...</div>;
+    }
 
     return (
         <div className="space-y-6">
@@ -100,6 +118,9 @@ const CustomersPage = () => {
                                     <div className="flex items-center gap-2">
                                         <button onClick={() => handleEdit(customer)} className="text-slate-400 hover:text-blue-600 transition-colors">
                                             <Eye size={16} />
+                                        </button>
+                                        <button onClick={() => handleDelete(customer.id)} className="text-slate-400 hover:text-red-600 transition-colors">
+                                            <Trash2 size={16} />
                                         </button>
                                     </div>
                                 </TableCell>

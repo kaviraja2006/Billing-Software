@@ -1,4 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
+import services from '../services/api';
 
 export const ProductContext = createContext();
 
@@ -11,47 +12,54 @@ export const useProducts = () => {
 };
 
 export const ProductProvider = ({ children }) => {
-    // Shared Mock Data with more fields for inventory
-    const defaultProducts = [
-        { id: 101, name: 'Wireless Mouse', category: 'Electronics', price: 25.50, stock: 45, barcode: '8901234567890', description: 'Ergonomic wireless mouse' },
-        { id: 102, name: 'Mechanical Keyboard', category: 'Electronics', price: 85.00, stock: 12, barcode: '8901234567891', description: 'RGB mechanical keyboard' },
-        { id: 103, name: 'USB-C Cable (2m)', category: 'Accessories', price: 12.00, stock: 100, barcode: '8901234567892', description: 'Fast charging cable' },
-        { id: 104, name: 'Monitor Stand', category: 'Furniture', price: 45.00, stock: 8, barcode: '8901234567893', description: 'Adjustable monitor stand' },
-        { id: 105, name: 'Webcam HD', category: 'Electronics', price: 55.00, stock: 20, barcode: '8901234567894', description: '1080p Web Camera' },
-    ];
-
-    const [products, setProducts] = useState(() => {
-        const saved = localStorage.getItem('products');
-        return saved ? JSON.parse(saved) : defaultProducts;
-    });
+    const [products, setProducts] = useState([]);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        localStorage.setItem('products', JSON.stringify(products));
-    }, [products]);
-
-    const addProduct = (productData) => {
-        const newProduct = {
-            id: Date.now(),
-            ...productData,
-            price: parseFloat(productData.price) || 0,
-            stock: parseInt(productData.stock) || 0
+        const fetchProducts = async () => {
+            setLoading(true);
+            try {
+                const response = await services.products.getAll();
+                setProducts(response.data);
+            } catch (error) {
+                console.error("Failed to fetch products", error);
+            } finally {
+                setLoading(false);
+            }
         };
-        setProducts(prev => [...prev, newProduct]);
-        return newProduct;
+        fetchProducts();
+    }, []);
+
+    const addProduct = async (productData) => {
+        try {
+            // Ensure sku is present for backend compatibility (it requires unique sku)
+            const payload = {
+                ...productData,
+                price: parseFloat(productData.price) || 0,
+                stock: parseInt(productData.stock) || 0,
+                sku: productData.barcode || `SKU-${Date.now()}-${Math.floor(Math.random() * 1000)}`
+            };
+
+            const response = await services.products.create(payload);
+            const newProduct = response.data;
+            setProducts(prev => [...prev, newProduct]);
+            return newProduct;
+        } catch (error) {
+            console.error("Failed to add product", error);
+            throw error;
+        }
     };
 
-    const addManyProducts = (productsArray) => {
-        console.log("Processing import for:", productsArray.length, "items");
-        const newProducts = productsArray.map((rawP, index) => {
+    const addManyProducts = async (productsArray) => {
+        const addedProducts = [];
+        // Sequential upload to mock API
+        for (const rawP of productsArray) {
             // Normalize keys: trim and lowercase
             const p = {};
             Object.keys(rawP).forEach(key => {
                 p[key.trim().toLowerCase()] = rawP[key];
             });
 
-            console.log(`Row ${index} normalized keys:`, Object.keys(p));
-
-            // Helper to get value from normalized keys
             const getVal = (keys) => {
                 for (let k of keys) {
                     if (p[k] !== undefined) return p[k];
@@ -62,47 +70,61 @@ export const ProductProvider = ({ children }) => {
             const name = getVal(['name', 'product name', 'productname', 'item', 'item name', 'title']) || 'Imported Product';
             const price = parseFloat(getVal(['price', 'mrp', 'rate', 'cost', 'amount', 'selling price', 'sp', 'unit price'])) || 0;
 
-            console.log(`Row ${index} mapped: Name=${name}, Price=${price}`);
+            const barcode = getVal(['barcode', 'code', 'upc', 'ean', 'sku']) || `GEN-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
-            return {
-                id: Date.now() + Math.floor(Math.random() * 10000) + index,
-                // Now we only need to check lowercased keys
+            const productData = {
                 name: name,
                 category: getVal(['category', 'group', 'type']) || 'Uncategorized',
                 brand: getVal(['brand', 'company', 'make']) || '',
                 price: price,
                 stock: parseInt(getVal(['stock', 'qty', 'quantity', 'count', 'inventory', 'balance', 'units'])) || 0,
-                barcode: getVal(['barcode', 'code', 'upc', 'ean', 'sku']) || `GEN-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+                barcode: barcode,
+                sku: barcode,
                 description: getVal(['description', 'desc', 'details', 'specification']) || ''
             };
-        });
 
-        console.log("Final Products to Add:", newProducts);
-        setProducts(prev => [...newProducts, ...prev]);
-        return newProducts;
-    };
-
-    const updateProduct = (id, updatedData) => {
-        setProducts(prev => prev.map(p => p.id === id ? {
-            ...p,
-            ...updatedData,
-            price: parseFloat(updatedData.price) || p.price,
-            stock: parseInt(updatedData.stock) || p.stock
-        } : p));
-    };
-
-    const deleteProduct = (id) => {
-        setProducts(prev => prev.filter(p => p.id !== id));
-    };
-
-    const updateStock = (id, quantityChange) => {
-        setProducts(prev => prev.map(p => {
-            if (p.id === id) {
-                const newStock = Math.max(0, p.stock + quantityChange); // Prevent negative stock
-                return { ...p, stock: newStock };
+            try {
+                const response = await services.products.create(productData);
+                addedProducts.push(response.data);
+            } catch (err) {
+                console.error("Failed to import item", name, err);
             }
-            return p;
-        }));
+        }
+        setProducts(prev => [...prev, ...addedProducts]);
+        return addedProducts;
+    };
+
+    const updateProduct = async (id, updatedData) => {
+        try {
+            const response = await services.products.update(id, updatedData);
+            const updatedProduct = response.data;
+            setProducts(prev => prev.map(p => p.id === id ? updatedProduct : p));
+            return updatedProduct;
+        } catch (error) {
+            console.error("Failed to update product", error);
+            throw error;
+        }
+    };
+
+    const deleteProduct = async (id) => {
+        try {
+            await services.products.delete(id);
+            setProducts(prev => prev.filter(p => p.id !== id));
+        } catch (error) {
+            console.error("Failed to delete product", error);
+            throw error;
+        }
+    };
+
+    const updateStock = async (id, quantityChange) => {
+        // This is tricky as we need to know current stock to update it properly via API if API is "update" style (replace).
+        // Better to fetch fresh, update, then save. Or assume local state is consistent.
+        // For mock, let's assume local state is close enough or fetch first.
+        const product = products.find(p => p.id === id);
+        if (product) {
+            const newStock = Math.max(0, product.stock + quantityChange);
+            await updateProduct(id, { stock: newStock });
+        }
     };
 
     const getProductByBarcode = (code) => {
@@ -117,7 +139,8 @@ export const ProductProvider = ({ children }) => {
             updateProduct,
             deleteProduct,
             updateStock,
-            getProductByBarcode
+            getProductByBarcode,
+            loading
         }}>
             {children}
         </ProductContext.Provider>

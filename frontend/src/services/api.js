@@ -1,0 +1,82 @@
+import axios from 'axios';
+import { mockAuthService } from './mock/auth';
+import { mockCustomerService } from './mock/customers';
+import { mockProductService } from './mock/products';
+import { mockBillingService } from './mock/billing';
+import { mockInvoiceService } from './mock/invoices';
+import { mockExpenseService } from './mock/expenses';
+import { mockReportService } from './mock/reports'; // Will create later
+import { mockSettingsService } from './mock/settings'; // Will create later
+
+const USE_MOCK = false; // Set to true to use mock services, false to use real API
+const API_BASE_URL = 'http://localhost:5001'; // Placeholder for real backend
+
+const api = axios.create({
+    baseURL: API_BASE_URL,
+    headers: {
+        'Content-Type': 'application/json',
+    },
+});
+
+// Request interceptor to attach token
+api.interceptors.request.use(
+    (config) => {
+        const token = localStorage.getItem('token');
+        if (token) {
+            config.headers['Authorization'] = `Bearer ${token}`;
+        }
+        return config;
+    },
+    (error) => Promise.reject(error)
+);
+
+// Response interceptor for handling errors
+api.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        // Handle 401/403 globally if needed
+        return Promise.reject(error);
+    }
+);
+
+// Mock Service Wrapper
+const services = {
+    auth: USE_MOCK ? mockAuthService : {
+        login: (credentials) => api.post('/auth/login', credentials),
+        register: (data) => api.post('/auth/register', data),
+        logout: () => api.post('/auth/logout'),
+        getCurrentUser: () => api.get('/auth/me'),
+    },
+    customers: USE_MOCK ? mockCustomerService : {
+        getAll: () => api.get('/customers'),
+        getById: (id) => api.get(`/customers/${id}`),
+        create: (data) => api.post('/customers', data),
+        update: (id, data) => api.put(`/customers/${id}`, data),
+        delete: (id) => api.delete(`/customers/${id}`),
+    },
+    products: USE_MOCK ? mockProductService : {
+        getAll: () => api.get('/products'),
+        getById: (id) => api.get(`/products/${id}`),
+        create: (data) => api.post('/products', data),
+        update: (id, data) => api.put(`/products/${id}`, data),
+        delete: (id) => api.delete(`/products/${id}`),
+    },
+    billing: USE_MOCK ? mockBillingService : {
+        createInvoice: (data) => api.post('/invoices', data),
+        // Billing usually results in an invoice creation
+    },
+    invoices: USE_MOCK ? mockInvoiceService : {
+        getAll: () => api.get('/invoices'),
+        getById: (id) => api.get(`/invoices/${id}`),
+    },
+    expenses: USE_MOCK ? mockExpenseService : {
+        getAll: () => api.get('/expenses'),
+        create: (data) => api.post('/expenses', data),
+        delete: (id) => api.delete(`/expenses/${id}`),
+    },
+    // Placeholders for now
+    reports: USE_MOCK ? mockReportService : {},
+    settings: USE_MOCK ? mockSettingsService : {},
+};
+
+export default services;
