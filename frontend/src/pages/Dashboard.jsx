@@ -71,7 +71,7 @@ const Dashboard = () => {
             }
         };
         fetchStats();
-    }, []);
+    }, [transactions.length]);
 
     const stats = [
         {

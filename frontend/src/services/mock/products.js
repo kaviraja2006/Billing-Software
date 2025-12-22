@@ -1,11 +1,27 @@
 const MOCK_DELAY = 500;
 
-let mockProducts = [
-    { id: '1', name: 'Wireless Mouse', sku: 'WM-001', category: 'Electronics', price: 29.99, stock: 150, unit: 'pcs' },
-    { id: '2', name: 'Mechanical Keyboard', sku: 'MK-002', category: 'Electronics', price: 89.99, stock: 50, unit: 'pcs' },
-    { id: '3', name: 'Office Chair', sku: 'OC-003', category: 'Furniture', price: 199.99, stock: 20, unit: 'pcs' },
-    { id: '4', name: 'USB-C Cable', sku: 'UC-004', category: 'Accessories', price: 12.50, stock: 500, unit: 'pcs' },
-];
+const STORAGE_KEY = 'billing_mock_products';
+
+const getStoredProducts = () => {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+        return JSON.parse(stored);
+    }
+    const initialProducts = [
+        { id: '1', name: 'Wireless Mouse', sku: 'WM-001', category: 'Electronics', price: 29.99, stock: 150, unit: 'pcs' },
+        { id: '2', name: 'Mechanical Keyboard', sku: 'MK-002', category: 'Electronics', price: 89.99, stock: 50, unit: 'pcs' },
+        { id: '3', name: 'Office Chair', sku: 'OC-003', category: 'Furniture', price: 199.99, stock: 20, unit: 'pcs' },
+        { id: '4', name: 'USB-C Cable', sku: 'UC-004', category: 'Accessories', price: 12.50, stock: 500, unit: 'pcs' },
+    ];
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(initialProducts));
+    return initialProducts;
+};
+
+let mockProducts = getStoredProducts();
+
+const saveProducts = () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(mockProducts));
+};
 
 export const mockProductService = {
     getAll: async () => {
@@ -37,6 +53,7 @@ export const mockProductService = {
                     ...data,
                 };
                 mockProducts.push(newProduct);
+                saveProducts();
                 resolve({ data: newProduct });
             }, MOCK_DELAY);
         });
@@ -48,6 +65,7 @@ export const mockProductService = {
                 const index = mockProducts.findIndex((p) => p.id === id);
                 if (index !== -1) {
                     mockProducts[index] = { ...mockProducts[index], ...data };
+                    saveProducts();
                     resolve({ data: mockProducts[index] });
                 } else {
                     reject({ response: { status: 404, data: { message: 'Product not found' } } });
@@ -62,6 +80,7 @@ export const mockProductService = {
                 const index = mockProducts.findIndex((p) => p.id === id);
                 if (index !== -1) {
                     mockProducts.splice(index, 1);
+                    saveCustomers();
                     resolve({ data: { message: 'Product deleted successfully' } });
                 } else {
                     reject({ response: { status: 404, data: { message: 'Product not found' } } });

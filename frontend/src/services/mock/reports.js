@@ -1,19 +1,26 @@
 import { mockInvoiceService } from './invoices';
 import { mockExpenseService } from './expenses';
+import { mockCustomerService } from './customers';
 
 const MOCK_DELAY = 500;
 
 export const mockReportService = {
     getDashboardStats: async () => {
         const invoices = (await mockInvoiceService.getAll()).data;
-        // Simple mock stats that could be dynamic
-        const totalSales = invoices.reduce((sum, i) => sum + (parseFloat(i.amount) || 0), 0);
+        const customers = (await mockCustomerService.getAll()).data;
+
+        // Dynamic stats calculation
+        const totalSales = invoices.reduce((sum, i) => {
+            const amount = parseFloat(i.total) || parseFloat(i.amount) || parseFloat(i.grandTotal) || 0;
+            return sum + amount;
+        }, 0);
+
         return new Promise((resolve) => {
             setTimeout(() => {
                 resolve({
                     data: {
                         totalSales: totalSales,
-                        activeCustomers: 124, // Mock
+                        activeCustomers: customers.length,
                         pendingInvoices: invoices.filter(i => i.status === 'Pending').length,
                         lowStockItems: 2, // Mock
                     }

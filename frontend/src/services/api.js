@@ -8,7 +8,7 @@ import { mockExpenseService } from './mock/expenses';
 import { mockReportService } from './mock/reports'; // Will create later
 import { mockSettingsService } from './mock/settings'; // Will create later
 
-const USE_MOCK = false; // Set to true to use mock services, false to use real API
+const USE_MOCK = true; // Set to true to use mock services, false to use real API
 const API_BASE_URL = 'http://localhost:5001'; // Placeholder for real backend
 
 const api = axios.create({
@@ -74,9 +74,15 @@ const services = {
         create: (data) => api.post('/expenses', data),
         delete: (id) => api.delete(`/expenses/${id}`),
     },
-    // Placeholders for now
-    reports: USE_MOCK ? mockReportService : {},
-    settings: USE_MOCK ? mockSettingsService : {},
+    reports: USE_MOCK ? mockReportService : {
+        getDashboardStats: () => api.get('/reports/dashboard'),
+        getSalesReport: (params) => api.get('/reports/sales', { params }),
+        getInventoryReport: () => api.get('/reports/inventory'),
+    },
+    settings: USE_MOCK ? mockSettingsService : {
+        getSettings: () => api.get('/settings'),
+        updateSettings: (data) => api.put('/settings', data),
+    },
 };
 
 export default services;
