@@ -97,7 +97,7 @@ const CustomersPage = () => {
                     </TableHeader>
                     <TableBody>
                         {filteredCustomers.map((customer) => (
-                            <TableRow key={customer.id}>
+                            <TableRow key={customer.id || customer._id}>
                                 <TableCell className="font-medium text-slate-900">{customer.name}</TableCell>
                                 <TableCell>
                                     <div className="flex flex-col text-sm text-slate-500">
@@ -105,11 +105,11 @@ const CustomersPage = () => {
                                         <span className="flex items-center gap-1"><Mail size={12} /> {customer.email || '-'}</span>
                                     </div>
                                 </TableCell>
-                                <TableCell className="text-center">{customer.totalVisits}</TableCell>
-                                <TableCell className="text-right">${customer.totalSpent.toFixed(2)}</TableCell>
+                                <TableCell className="text-center">{customer.totalVisits || 0}</TableCell>
+                                <TableCell className="text-right">${(customer.totalSpent || 0).toFixed(2)}</TableCell>
                                 <TableCell className="text-right">
-                                    {customer.due > 0 ? (
-                                        <span className="text-red-600 font-medium">${customer.due.toFixed(2)}</span>
+                                    {(customer.due || 0) > 0 ? (
+                                        <span className="text-red-600 font-medium">${(customer.due || 0).toFixed(2)}</span>
                                     ) : (
                                         <span className="text-slate-400">-</span>
                                     )}

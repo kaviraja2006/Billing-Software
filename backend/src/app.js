@@ -17,7 +17,10 @@ const app = express();
 
 // Middleware
 app.use(helmet());
-app.use(cors());
+app.use(cors({
+    origin: ['http://localhost:5173', 'http://localhost:3000'],
+    credentials: true
+}));
 app.use(express.json());
 if (process.env.NODE_ENV === 'development') {
     app.use(morgan('dev'));

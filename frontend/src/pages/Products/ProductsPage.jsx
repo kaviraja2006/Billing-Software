@@ -6,6 +6,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Search, Plus, Download, Upload, MoreHorizontal, Edit, Trash, Filter } from 'lucide-react';
 import { useProducts } from '../../context/ProductContext';
 import ProductDrawer from './ProductDrawer';
+import CategoryWizard from './CategoryWizard';
 
 import { read, utils, writeFile } from 'xlsx';
 
@@ -15,10 +16,22 @@ const ProductsPage = () => {
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
 
+    // Category Filter State
+    const [isCategoryWizardOpen, setIsCategoryWizardOpen] = useState(false);
+    const [selectedCategory, setSelectedCategory] = useState(null);
+
+    // Extract Unique Categories
+    const uniqueCategories = React.useMemo(() => {
+        return [...new Set(products.map(p => p.category || 'Uncategorized'))].filter(Boolean).sort();
+    }, [products]);
+
     const filteredProducts = products.filter(p =>
-        (p.name && p.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (p.category && p.category.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (p.barcode && p.barcode.toString().includes(searchTerm))
+        (!selectedCategory || p.category === selectedCategory) &&
+        (
+            (p.name && p.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+            (p.category && p.category.toLowerCase().includes(searchTerm.toLowerCase())) ||
+            (p.barcode && p.barcode.toString().includes(searchTerm))
+        )
     );
 
     const handleEdit = (product) => {
@@ -144,8 +157,21 @@ const ProductsPage = () => {
                             />
                         </div>
                         <div className="flex gap-2">
-                            <Button variant="outline" className="w-full sm:w-auto">
-                                <Filter className="mr-2 h-4 w-4" /> Category
+                            <Button
+                                variant={selectedCategory ? "default" : "outline"}
+                                className="w-full sm:w-auto"
+                                onClick={() => setIsCategoryWizardOpen(true)}
+                            >
+                                <Filter className="mr-2 h-4 w-4" />
+                                {selectedCategory ? selectedCategory : 'Category'}
+                                {selectedCategory && (
+                                    <span
+                                        className="ml-2 hover:text-red-200"
+                                        onClick={(e) => { e.stopPropagation(); setSelectedCategory(null); }}
+                                    >
+                                        ×
+                                    </span>
+                                )}
                             </Button>
                             <Button variant="outline" className="w-full sm:w-auto">
                                 <Filter className="mr-2 h-4 w-4" /> Stock Status
@@ -218,6 +244,13 @@ const ProductsPage = () => {
                         onClose={() => setIsDrawerOpen(false)}
                         product={selectedProduct}
                         onSave={handleSaveProduct}
+                    />
+
+                    <CategoryWizard
+                        isOpen={isCategoryWizardOpen}
+                        onClose={() => setIsCategoryWizardOpen(false)}
+                        categories={uniqueCategories}
+                        onSelectCategory={setSelectedCategory}
                     />
                 </>
             )}

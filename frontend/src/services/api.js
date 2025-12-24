@@ -34,7 +34,14 @@ api.interceptors.request.use(
 api.interceptors.response.use(
     (response) => response,
     (error) => {
-        // Handle 401/403 globally if needed
+        if (error.response && error.response.status === 401) {
+            // Only redirect if not already on login page
+            if (!window.location.pathname.includes('/login')) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.href = '/login';
+            }
+        }
         return Promise.reject(error);
     }
 );
@@ -74,9 +81,17 @@ const services = {
         create: (data) => api.post('/expenses', data),
         delete: (id) => api.delete(`/expenses/${id}`),
     },
-    // Placeholders for now
-    reports: USE_MOCK ? mockReportService : {},
-    settings: USE_MOCK ? mockSettingsService : {},
+    reports: USE_MOCK ? mockReportService : {
+        getDashboardStats: () => api.get('/reports/dashboard'),
+        getFinancialStats: () => api.get('/reports/financials'),
+        getSalesTrend: () => api.get('/reports/sales-trend'),
+        getPaymentMethodStats: () => api.get('/reports/payment-methods'),
+        getTopProducts: () => api.get('/reports/top-products'),
+    },
+    settings: USE_MOCK ? mockSettingsService : {
+        getSettings: () => api.get('/settings'),
+        updateSettings: (data) => api.put('/settings', data),
+    },
 };
 
 export default services;

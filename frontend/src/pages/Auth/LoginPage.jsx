@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
@@ -89,9 +89,8 @@ const LoginPage = () => {
                         Sign In
                     </Button>
 
-                    <div className="text-center text-xs text-slate-400">
-                        <p>Demo Credentials:</p>
-                        <p>Email: admin@example.com | Password: password</p>
+                    <div className="text-center mt-4">
+                        <p>Don't have an account? <Link to="/signup" className="text-blue-600 hover:underline">Sign Up</Link></p>
                     </div>
                 </form>
             </Card>

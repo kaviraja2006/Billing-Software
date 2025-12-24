@@ -13,6 +13,7 @@ import Settings from './pages/Settings/SettingsPage';
 import BarcodeGenerator from './pages/Barcode/BarcodePage';
 
 import LoginPage from './pages/Auth/LoginPage';
+import SignupPage from './pages/Auth/SignupPage';
 import ProtectedRoute from './components/layout/ProtectedRoute';
 import { AuthProvider } from './context/AuthContext';
 import { CustomerProvider } from './context/CustomerContext';
@@ -32,6 +33,7 @@ function App() {
                 <BrowserRouter>
                   <Routes>
                     <Route path="/login" element={<LoginPage />} />
+                    <Route path="/signup" element={<SignupPage />} />
 
                     <Route path="/" element={
                       <ProtectedRoute>

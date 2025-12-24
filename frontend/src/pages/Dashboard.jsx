@@ -63,7 +63,7 @@ const Dashboard = () => {
                 const response = await services.reports.getDashboardStats();
                 setStatsData({
                     totalSales: response.data.totalSales,
-                    totalOrders: response.data.pendingInvoices + 100, // Just a mock offset
+                    totalOrders: response.data.totalOrders,
                     totalCustomers: response.data.activeCustomers,
                 });
             } catch (error) {

@@ -24,10 +24,9 @@ export const AuthProvider = ({ children }) => {
                     const response = await services.auth.getCurrentUser();
                     setUser(response.data);
                 } else {
-                    const storedUser = localStorage.getItem('user');
-                    if (storedUser) {
-                        setUser(JSON.parse(storedUser));
-                    }
+                    // No token means no user
+                    setUser(null);
+                    localStorage.removeItem('user'); // Clean up potential stale data
                 }
             } catch (error) {
                 console.error("Auth init error:", error);
@@ -44,15 +43,27 @@ export const AuthProvider = ({ children }) => {
         try {
             const response = await services.auth.login({ email, password });
             const { user, token } = response.data;
-
             setUser(user);
-            // Storage is handled in mock service for simplicity, but we can double check
-            if (!localStorage.getItem('token')) localStorage.setItem('token', token);
-            if (!localStorage.getItem('user')) localStorage.setItem('user', JSON.stringify(user));
-
+            // Store token and user in localStorage
+            localStorage.setItem('token', token);
+            localStorage.setItem('user', JSON.stringify(user));
             return user;
         } catch (error) {
             throw error.response?.data?.message || 'Login failed';
+        }
+    };
+
+    const register = async (name, email, password) => {
+        try {
+            const response = await services.auth.register({ name, email, password });
+            const { user, token } = response.data;
+            setUser(user);
+            // Store token and user in localStorage
+            localStorage.setItem('token', token);
+            localStorage.setItem('user', JSON.stringify(user));
+            return user;
+        } catch (error) {
+            throw error.response?.data?.message || 'Signup failed';
         }
     };
 
@@ -68,7 +79,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ user, login, logout, isLoading }}>
+        <AuthContext.Provider value={{ user, login, register, logout, isLoading }}>
             {children}
         </AuthContext.Provider>
     );
