@@ -89,8 +89,17 @@ const LoginPage = () => {
                         Sign In
                     </Button>
 
-                    <div className="text-center mt-4">
-                        <p>Don't have an account? <Link to="/signup" className="text-blue-600 hover:underline">Sign Up</Link></p>
+                    <div className="text-center text-sm text-slate-600">
+                        Don't have an account?{' '}
+                        <Link to="/signup" className="text-blue-600 hover:text-blue-700 font-medium">
+                            Sign up
+                        </Link>
+                    </div>
+
+                    <div className="text-center text-xs text-slate-400 pt-4 border-t">
+                        <p className="font-medium mb-1">Demo Credentials:</p>
+                        <p>Email: admin@example.com</p>
+                        <p>Password: password</p>
                     </div>
                 </form>
             </Card>

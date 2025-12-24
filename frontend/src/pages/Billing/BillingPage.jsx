@@ -397,43 +397,37 @@ const BillingPage = () => {
             {/* Main Workspace */}
             <div className="flex flex-1 overflow-hidden p-2 gap-2">
 
-                {/* Left Pane - Search & Grid */}
-                <div className="flex-1 flex flex-col gap-2 bg-transparent">
-                    {/* Item Search Bar */}
-                    <div className="relative z-20">
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-500 h-5 w-5" />
-                            <Input
-                                ref={searchInputRef}
-                                autoFocus
-                                className="pl-10 h-12 text-lg border-blue-300 focus:border-blue-600 shadow-sm"
-                                placeholder="Scan or search by item code, model no or item name"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                            />
+                    {/* Footer Actions - Hide on Payment Step (4) as it has its own controls */}
+                    {currentStep !== 4 && (
+                        <div className="border-t border-slate-100 bg-white p-4 flex justify-between items-center">
+                            <Button
+                                variant="outline"
+                                onClick={prevStep}
+                                disabled={currentStep === 1}
+                                className="w-32"
+                            >
+                                <ChevronLeft className="mr-2 h-4 w-4" /> Back
+                            </Button>
+
+                            {currentStep < steps.length ? (
+                                <Button
+                                    onClick={nextStep}
+                                    className="w-32"
+                                    disabled={currentStep === 1 && !billingData.customer} // Require customer selection
+                                >
+                                    Next <ChevronRight className="ml-2 h-4 w-4" />
+                                </Button>
+                            ) : (
+                                /* This "Complete Sale" button was dead/unused. 
+                                   Since we hide the footer on step 4, this is effectively removed, 
+                                   but we keep the logic structure clean.
+                                */
+                                null
+                            )}
                         </div>
-                        {/* Autocomplete Dropdown */}
-                        {searchTerm && filteredProducts.length > 0 && (
-                            <div className="absolute w-full mt-1 bg-white border rounded-md shadow-lg py-1 max-h-60 overflow-y-auto">
-                                {filteredProducts.map(product => (
-                                    <div
-                                        key={product.id || product._id}
-                                        className="px-4 py-2 hover:bg-blue-50 cursor-pointer flex justify-between border-b last:border-0"
-                                        onClick={() => addToCart(product)}
-                                    >
-                                        <div>
-                                            <span className="font-bold block text-slate-700">{product.name}</span>
-                                            <span className="text-xs text-slate-400">{product.sku} | {product.category}</span>
-                                        </div>
-                                        <div className="text-right">
-                                            <span className="font-medium text-blue-600">₹{product.price || product.sellingPrice}</span>
-                                            <span className="block text-xs text-slate-400">Stock: {product.stock}</span>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
+                    )}
+                </Card>
+            </div>
 
                     {/* Data Grid */}
                     <BillingGrid
