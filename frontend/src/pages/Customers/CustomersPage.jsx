@@ -97,7 +97,7 @@ const CustomersPage = () => {
                     </TableHeader>
                     <TableBody>
                         {filteredCustomers.map((customer) => (
-                            <TableRow key={customer.id}>
+                            <TableRow key={customer.id || customer._id}>
                                 <TableCell className="font-medium text-slate-900">{customer.name}</TableCell>
                                 <TableCell>
                                     <div className="flex flex-col text-sm text-slate-500">

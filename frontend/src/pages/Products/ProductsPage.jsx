@@ -6,6 +6,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Search, Plus, Download, Upload, MoreHorizontal, Edit, Trash, Filter } from 'lucide-react';
 import { useProducts } from '../../context/ProductContext';
 import ProductDrawer from './ProductDrawer';
+import CategoryWizard from './CategoryWizard';
 
 import { read, utils, writeFile } from 'xlsx';
 
@@ -14,6 +15,15 @@ const ProductsPage = () => {
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
+
+    // Category Filter State
+    const [isCategoryWizardOpen, setIsCategoryWizardOpen] = useState(false);
+    const [selectedCategory, setSelectedCategory] = useState(null);
+
+    // Extract Unique Categories
+    const uniqueCategories = React.useMemo(() => {
+        return [...new Set(products.map(p => p.category || 'Uncategorized'))].filter(Boolean).sort();
+    }, [products]);
 
     const filteredProducts = products.filter(p =>
         (p.name && p.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
