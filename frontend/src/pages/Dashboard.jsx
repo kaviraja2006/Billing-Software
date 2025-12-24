@@ -18,6 +18,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import { useTransactions } from '../context/TransactionContext';
+import { useExpenses } from '../context/ExpenseContext';
 import services from '../services/api';
 
 const StatCard = ({ title, value, change, changeType, icon: Icon, color }) => (
@@ -48,8 +49,9 @@ const StatCard = ({ title, value, change, changeType, icon: Icon, color }) => (
 const Dashboard = () => {
     // Mock Data
     const { transactions } = useTransactions();
+    const { stats: expenseStats } = useExpenses();
     // const { customers } = useCustomers(); // Not needed for stats anymore
-    const recentOrders = transactions.slice(0, 5);
+    const recentOrders = (transactions || []).slice(0, 5);
     const [statsData, setStatsData] = useState({
         totalSales: 0,
         totalOrders: 0,
@@ -97,7 +99,7 @@ const Dashboard = () => {
         },
         {
             title: 'Total Expenses',
-            value: '$1,240', // TODO: Fetch from expenses service if needed
+            value: `$${(expenseStats?.totalExpenses || 0).toFixed(2)}`,
             change: '-3.1%',
             icon: TrendingUp,
             color: 'bg-orange-500',

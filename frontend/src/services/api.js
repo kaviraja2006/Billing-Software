@@ -8,7 +8,7 @@ import { mockExpenseService } from './mock/expenses';
 import { mockReportService } from './mock/reports'; // Will create later
 import { mockSettingsService } from './mock/settings'; // Will create later
 
-const USE_MOCK = true; // Set to true to use mock services, false to use real API
+const USE_MOCK = false; // Set to true to use mock services, false to use real API
 const API_BASE_URL = 'http://localhost:5001'; // Placeholder for real backend
 
 const api = axios.create({
@@ -34,7 +34,19 @@ api.interceptors.request.use(
 api.interceptors.response.use(
     (response) => response,
     (error) => {
-        // Handle 401/403 globally if needed
+        // Handle network errors (server not running, connection refused, etc.)
+        if (!error.response) {
+            console.error('Network error: Backend server may not be running. Please ensure the backend is started on port 5001.');
+        }
+        
+        if (error.response && error.response.status === 401) {
+            // Only redirect if not already on login page
+            if (!window.location.pathname.includes('/login')) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.href = '/login';
+            }
+        }
         return Promise.reject(error);
     }
 );
@@ -68,6 +80,7 @@ const services = {
     invoices: USE_MOCK ? mockInvoiceService : {
         getAll: () => api.get('/invoices'),
         getById: (id) => api.get(`/invoices/${id}`),
+        delete: (id) => api.delete(`/invoices/${id}`),
     },
     expenses: USE_MOCK ? mockExpenseService : {
         getAll: () => api.get('/expenses'),
@@ -76,8 +89,10 @@ const services = {
     },
     reports: USE_MOCK ? mockReportService : {
         getDashboardStats: () => api.get('/reports/dashboard'),
-        getSalesReport: (params) => api.get('/reports/sales', { params }),
-        getInventoryReport: () => api.get('/reports/inventory'),
+        getFinancialStats: () => api.get('/reports/financials'),
+        getSalesTrend: () => api.get('/reports/sales-trend'),
+        getPaymentMethodStats: () => api.get('/reports/payment-methods'),
+        getTopProducts: () => api.get('/reports/top-products'),
     },
     settings: USE_MOCK ? mockSettingsService : {
         getSettings: () => api.get('/settings'),

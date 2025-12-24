@@ -28,7 +28,7 @@ const LoginPage = () => {
             await login(email, password);
             navigate(from, { replace: true });
         } catch (err) {
-            setError(err);
+            setError(err.message || 'Login failed');
         } finally {
             setIsSubmitting(false);
         }

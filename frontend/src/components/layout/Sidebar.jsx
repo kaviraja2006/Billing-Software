@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { cn } from '../../lib/utils';
+import { useAuth } from '../../context/AuthContext';
 import {
     LayoutDashboard,
     Receipt,
@@ -11,10 +12,16 @@ import {
     Wallet,
     Settings,
     ScanBarcode,
-    LogOut
+    LogOut,
+    Menu
 } from 'lucide-react';
 
-const Sidebar = () => {
+const Sidebar = ({ isOpen = true, toggleSidebar }) => {
+    const { user, logout } = useAuth();
+
+    const handleLogout = async () => {
+        await logout();
+    };
     const navItems = [
         { label: 'Dashboard', icon: LayoutDashboard, path: '/' },
         { label: 'Billing', icon: Receipt, path: '/billing' },
@@ -27,16 +34,31 @@ const Sidebar = () => {
         { label: 'Barcode', icon: ScanBarcode, path: '/barcode' },
     ];
 
+    const userName = user?.name || 'User';
+    const userEmail = user?.email || '';
+    const userInitials = userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+
     return (
-        <div className="flex h-screen w-64 flex-col border-r border-slate-200 bg-white shadow-sm">
+        <div className="flex h-full w-full flex-col border-r border-slate-200 bg-white shadow-sm">
             {/* Logo Area */}
-            <div className="flex h-16 items-center border-b border-slate-100 px-6">
+            <div className="flex h-16 items-center justify-between border-b border-slate-100 px-4">
                 <div className="flex items-center gap-2">
                     <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white shadow-md">
                         <Receipt size={20} strokeWidth={2.5} />
                     </div>
-                    <span className="text-xl font-bold text-slate-900 tracking-tight">POS System</span>
+                    {isOpen && (
+                        <span className="text-xl font-bold text-slate-900 tracking-tight">POS System</span>
+                    )}
                 </div>
+                {toggleSidebar && (
+                    <button
+                        onClick={toggleSidebar}
+                        className="p-1.5 rounded-md hover:bg-slate-100 text-slate-600 hover:text-slate-900 transition-colors"
+                        aria-label="Toggle sidebar"
+                    >
+                        <Menu size={18} />
+                    </button>
+                )}
             </div>
 
             {/* Navigation */}
@@ -53,15 +75,16 @@ const Sidebar = () => {
                                     : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                             )
                         }
+                        title={!isOpen ? item.label : undefined}
                     >
                         {({ isActive }) => (
                             <>
                                 <item.icon
                                     size={20}
-                                    className={cn("transition-colors", isActive ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600")}
+                                    className={cn("transition-colors flex-shrink-0", isActive ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600")}
                                     strokeWidth={isActive ? 2.5 : 2}
                                 />
-                                {item.label}
+                                {isOpen && <span>{item.label}</span>}
                             </>
                         )}
                     </NavLink>
@@ -71,15 +94,21 @@ const Sidebar = () => {
             {/* User / Footer */}
             <div className="border-t border-slate-100 p-4">
                 <div className="flex items-center gap-3 rounded-lg bg-slate-50 p-3 shadow-inner">
-                    <div className="h-10 w-10 overflow-hidden rounded-full bg-slate-200 border-2 border-white shadow-sm">
-                        {/* Placeholder Avatar */}
-                        <img src="https://ui-avatars.com/api/?name=Admin+User&background=0D8ABC&color=fff" alt="User" />
+                    <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded-full bg-blue-600 border-2 border-white shadow-sm flex items-center justify-center text-white font-semibold text-sm">
+                        {userInitials || 'U'}
                     </div>
-                    <div className="flex-1 overflow-hidden">
-                        <p className="truncate text-sm font-semibold text-slate-900">Admin User</p>
-                        <p className="truncate text-xs text-slate-500">Store Manager</p>
-                    </div>
-                    <button className="text-slate-400 hover:text-red-500 transition-colors">
+                    {isOpen && (
+                        <div className="flex-1 overflow-hidden min-w-0">
+                            <p className="truncate text-sm font-semibold text-slate-900">{userName}</p>
+                            <p className="truncate text-xs text-slate-500">{userEmail || 'Store Manager'}</p>
+                        </div>
+                    )}
+                    <button
+                        onClick={handleLogout}
+                        className="text-slate-400 hover:text-red-500 transition-colors p-1.5 rounded-md hover:bg-red-50 flex-shrink-0"
+                        title="Logout"
+                        aria-label="Logout"
+                    >
                         <LogOut size={18} />
                     </button>
                 </div>

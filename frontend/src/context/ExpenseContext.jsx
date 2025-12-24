@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import services from '../services/api';
+import { useAuth } from './AuthContext';
 
 const ExpenseContext = createContext();
 
@@ -13,18 +14,28 @@ export const useExpenses = () => {
 
 export const ExpenseProvider = ({ children }) => {
     const [expenses, setExpenses] = useState([]);
+    const { user, isLoading: authLoading } = useAuth();
 
     useEffect(() => {
+        // Only fetch if user is authenticated and auth is not loading
+        if (authLoading || !user) {
+            if (!user) {
+                setExpenses([]);
+            }
+            return;
+        }
+
         const fetchExpenses = async () => {
             try {
                 const response = await services.expenses.getAll();
                 setExpenses(response.data);
             } catch (error) {
                 console.error("Failed to fetch expenses", error);
+                setExpenses([]);
             }
         };
         fetchExpenses();
-    }, []);
+    }, [user, authLoading]);
 
     const addExpense = async (expenseData) => {
         try {

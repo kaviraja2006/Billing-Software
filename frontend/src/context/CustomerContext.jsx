@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import services from '../services/api';
+import { useAuth } from './AuthContext';
 
 const CustomerContext = createContext();
 
@@ -14,8 +15,18 @@ export const useCustomers = () => {
 export const CustomerProvider = ({ children }) => {
     const [customers, setCustomers] = useState([]);
     const [loading, setLoading] = useState(true);
+    const { user, isLoading: authLoading } = useAuth();
 
     useEffect(() => {
+        // Only fetch if user is authenticated and auth is not loading
+        if (authLoading || !user) {
+            setLoading(false);
+            if (!user) {
+                setCustomers([]);
+            }
+            return;
+        }
+
         const fetchCustomers = async () => {
             setLoading(true);
             try {
@@ -23,12 +34,13 @@ export const CustomerProvider = ({ children }) => {
                 setCustomers(response.data);
             } catch (error) {
                 console.error("Failed to fetch customers", error);
+                setCustomers([]);
             } finally {
                 setLoading(false);
             }
         };
         fetchCustomers();
-    }, []);
+    }, [user, authLoading]);
 
     const addCustomer = async (customerData) => {
         try {

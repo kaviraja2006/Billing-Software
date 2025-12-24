@@ -3,13 +3,24 @@ const http = require('http');
 const app = require('./src/app');
 const connectDB = require('./src/config/db');
 
-const PORT = process.env.PORT || 5000;
+const fs = require('fs');
+const path = require('path');
 
-// Connect to Database
-connectDB();
+const PORT = process.env.PORT || 5001;
 
-const server = http.createServer(app);
+const startServer = () => {
+    // Connect to Database (Non-blocking)
+    connectDB().then(() => {
+        fs.writeFileSync(path.join(__dirname, 'db_status.txt'), `Connected at ${new Date().toISOString()}`);
+    }).catch(err => {
+        fs.writeFileSync(path.join(__dirname, 'db_status.txt'), `Failed at ${new Date().toISOString()}: ${err.message}`);
+    });
 
-server.listen(PORT, () => {
-    console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
-});
+    const server = http.createServer(app);
+
+    server.listen(PORT, () => {
+        console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+    });
+};
+
+startServer();

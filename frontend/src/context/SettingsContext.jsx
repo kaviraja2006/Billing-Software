@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import services from '../services/api';
+import { useAuth } from './AuthContext';
 
 const SettingsContext = createContext();
 
@@ -12,6 +13,7 @@ export const useSettings = () => {
 };
 
 export const SettingsProvider = ({ children }) => {
+    const { user, isLoading: authLoading } = useAuth();
     const defaultSettings = {
         tax: {
             gstEnabled: true,
@@ -54,6 +56,15 @@ export const SettingsProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        // Only fetch if user is authenticated and auth is not loading
+        if (authLoading || !user) {
+            setLoading(false);
+            if (!user) {
+                setSettings(defaultSettings);
+            }
+            return;
+        }
+
         const fetchSettings = async () => {
             try {
                 const response = await services.settings.getSettings();
@@ -66,7 +77,7 @@ export const SettingsProvider = ({ children }) => {
             }
         };
         fetchSettings();
-    }, []);
+    }, [user, authLoading]);
 
     const saveSettings = async (newSettings) => {
         try {

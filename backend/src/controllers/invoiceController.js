@@ -12,9 +12,13 @@ const getInvoices = asyncHandler(async (req, res) => {
     const response = invoices.map(inv => ({
         id: inv._id,
         customerName: inv.customerName,
+        customer: inv.customerName, // For frontend compatibility
         date: inv.date,
         total: inv.total,
-        status: inv.status
+        amount: inv.total, // For frontend compatibility
+        status: inv.status,
+        method: inv.paymentMethod || 'Cash', // For frontend compatibility
+        paymentMethod: inv.paymentMethod || 'Cash'
     }));
     res.json(response);
 });
@@ -29,6 +33,7 @@ const getInvoiceById = asyncHandler(async (req, res) => {
         res.json({
             id: invoice._id,
             customerName: invoice.customerName,
+            customer: invoice.customerName, // For frontend compatibility
             customerId: invoice.customerId,
             date: invoice.date,
             items: invoice.items.map(item => ({
@@ -42,7 +47,16 @@ const getInvoiceById = asyncHandler(async (req, res) => {
             tax: invoice.tax,
             discount: invoice.discount,
             total: invoice.total,
-            status: invoice.status
+            amount: invoice.total, // For frontend compatibility
+            status: invoice.status,
+            method: invoice.paymentMethod || 'Cash', // For frontend compatibility
+            paymentMethod: invoice.paymentMethod || 'Cash',
+            totals: { // For frontend compatibility
+                subtotal: invoice.subtotal,
+                tax: invoice.tax,
+                discount: invoice.discount,
+                total: invoice.total
+            }
         });
     } else {
         res.status(404);
@@ -165,19 +179,63 @@ const createInvoice = asyncHandler(async (req, res) => {
         id: invoice._id,
         customerId: invoice.customerId,
         customerName: invoice.customerName,
+        customer: invoice.customerName, // For frontend compatibility
         date: invoice.date,
         items: invoice.items,
         subtotal: invoice.subtotal,
         tax: invoice.tax,
         discount: invoice.discount,
         total: invoice.total,
+        amount: invoice.total, // For frontend compatibility
         status: invoice.status,
-        paymentMethod: invoice.paymentMethod
+        method: invoice.paymentMethod || 'Cash', // For frontend compatibility
+        paymentMethod: invoice.paymentMethod || 'Cash',
+        totals: { // For frontend compatibility
+            subtotal: invoice.subtotal,
+            tax: invoice.tax,
+            discount: invoice.discount,
+            total: invoice.total
+        }
     });
+});
+
+// @desc    Delete invoice
+// @route   DELETE /invoices/:id
+// @access  Private
+const deleteInvoice = asyncHandler(async (req, res) => {
+    const invoice = await Invoice.findById(req.params.id);
+
+    if (invoice) {
+        // Restore stock for items in the invoice
+        for (const item of invoice.items) {
+            const product = await Product.findById(item.productId);
+            if (product) {
+                product.stock += item.quantity;
+                await product.save();
+            }
+        }
+
+        // Update customer stats if customer exists
+        if (invoice.customerId) {
+            const customer = await Customer.findById(invoice.customerId);
+            if (customer) {
+                customer.totalSpent = Math.max(0, customer.totalSpent - invoice.total);
+                customer.totalVisits = Math.max(0, customer.totalVisits - 1);
+                await customer.save();
+            }
+        }
+
+        await invoice.deleteOne();
+        res.json({ message: 'Invoice deleted successfully' });
+    } else {
+        res.status(404);
+        throw new Error('Invoice not found');
+    }
 });
 
 module.exports = {
     getInvoices,
     getInvoiceById,
     createInvoice,
+    deleteInvoice,
 };

@@ -17,8 +17,9 @@ const InvoicesPage = () => {
 
     // Filter transactions
     const filteredTransactions = transactions.filter(t =>
-        t.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        t.customer.toLowerCase().includes(searchTerm.toLowerCase())
+        (t.id && t.id.toString().toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (t.customer && t.customer.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (t.customerName && t.customerName.toLowerCase().includes(searchTerm.toLowerCase()))
     );
 
     const handleViewInvoice = (invoice) => {
@@ -100,18 +101,18 @@ const InvoicesPage = () => {
                                 filteredTransactions.map((invoice) => (
                                     <TableRow key={invoice.id}>
                                         <TableCell className="font-medium text-blue-600">{invoice.id}</TableCell>
-                                        <TableCell>{invoice.date}</TableCell>
-                                        <TableCell>{invoice.customer}</TableCell>
-                                        <TableCell className="font-bold">{invoice.amount}</TableCell>
+                                        <TableCell>{invoice.date ? new Date(invoice.date).toLocaleDateString() : 'N/A'}</TableCell>
+                                        <TableCell>{invoice.customer || invoice.customerName || 'Walk-in Customer'}</TableCell>
+                                        <TableCell className="font-bold">${(invoice.amount || invoice.total || 0).toFixed(2)}</TableCell>
                                         <TableCell>
                                             <Badge
-                                                variant={invoice.status === 'Completed' ? 'success' : invoice.status === 'Pending' ? 'warning' : 'destructive'}
+                                                variant={invoice.status === 'Completed' || invoice.status === 'Paid' ? 'success' : invoice.status === 'Pending' ? 'warning' : 'destructive'}
                                                 className="bg-opacity-15 text-opacity-100"
                                             >
-                                                {invoice.status}
+                                                {invoice.status || 'Paid'}
                                             </Badge>
                                         </TableCell>
-                                        <TableCell>{invoice.method}</TableCell>
+                                        <TableCell>{invoice.method || invoice.paymentMethod || 'Cash'}</TableCell>
                                         <TableCell className="text-right">
                                             <Button
                                                 variant="ghost"

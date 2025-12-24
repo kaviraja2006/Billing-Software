@@ -13,8 +13,6 @@ import { printReceipt } from '../../utils/printReceipt';
 
 const PaymentStep = ({ billingData, onComplete }) => {
     const { addTransaction } = useTransactions();
-    const { customers, updateCustomer } = useCustomers();
-    const { updateStock } = useProducts();
     const [method, setMethod] = useState('cash'); // cash, card, upi, split
     const [splitCash, setSplitCash] = useState('');
     const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
@@ -53,21 +51,13 @@ const PaymentStep = ({ billingData, onComplete }) => {
                 total: Number(totalAmount)
             };
 
-            // 1. Create Invoice/Transaction
+            // 1. Create Invoice/Transaction (Backend already handles customer stats and stock updates)
             const newInvoice = await addTransaction(invoiceData);
 
-            // 2. Update Customer Stats if registered
-            if (billingData.customer && billingData.customer.id) {
-                const currentCustomer = customers.find(c => c.id === billingData.customer.id);
-                if (currentCustomer) {
-                    await updateCustomer(currentCustomer.id, {
-                        totalVisits: (currentCustomer.totalVisits || 0) + 1,
-                        totalSpent: (currentCustomer.totalSpent || 0) + totalAmount
-                    });
-                }
-            }
+            // 2. Refresh customer data to get updated stats (backend already updated them)
+            // Note: Backend automatically updates customer stats when creating invoice
 
-            // 3. Update Inventory (Deduct Stock)
+            // 3. Stock is already updated by backend when invoice is created
             if (billingData.cart && billingData.cart.length > 0) {
                 // Execute all stock updates in parallel
                 await Promise.all(billingData.cart.map(item =>

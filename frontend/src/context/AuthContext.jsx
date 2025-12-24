@@ -24,10 +24,9 @@ export const AuthProvider = ({ children }) => {
                     const response = await services.auth.getCurrentUser();
                     setUser(response.data);
                 } else {
-                    const storedUser = localStorage.getItem('user');
-                    if (storedUser) {
-                        setUser(JSON.parse(storedUser));
-                    }
+                    // No token means no user
+                    setUser(null);
+                    localStorage.removeItem('user'); // Clean up potential stale data
                 }
             } catch (error) {
                 console.error("Auth init error:", error);
@@ -42,28 +41,67 @@ export const AuthProvider = ({ children }) => {
 
     const login = async (email, password) => {
         try {
-            const response = await services.auth.login({ email, password });
+            // Validate inputs before sending
+            if (!email || !email.trim()) {
+                throw new Error('Email is required');
+            }
+            if (!password) {
+                throw new Error('Password is required');
+            }
+
+            const response = await services.auth.login({ email: email.trim(), password });
             const { user, token } = response.data;
-
             setUser(user);
-            // Storage is handled in mock service for simplicity, but we can double check
-            if (!localStorage.getItem('token')) localStorage.setItem('token', token);
-            if (!localStorage.getItem('user')) localStorage.setItem('user', JSON.stringify(user));
-
+            // Store token and user in localStorage
+            localStorage.setItem('token', token);
+            localStorage.setItem('user', JSON.stringify(user));
             return user;
         } catch (error) {
-            throw error.response?.data?.message || 'Login failed';
+            // Extract error message from various possible formats
+            const errorMessage = error.response?.data?.message || error.message || 'Login failed';
+            throw new Error(errorMessage);
+        }
+    };
+
+    const register = async (name, email, password) => {
+        try {
+            // Validate inputs before sending
+            if (!name || !name.trim()) {
+                throw new Error('Name is required');
+            }
+            if (!email || !email.trim()) {
+                throw new Error('Email is required');
+            }
+            if (!password || password.length < 6) {
+                throw new Error('Password must be at least 6 characters');
+            }
+
+            const response = await services.auth.register({ name: name.trim(), email: email.trim(), password });
+            const { user, token } = response.data;
+            setUser(user);
+            // Store token and user in localStorage
+            localStorage.setItem('token', token);
+            localStorage.setItem('user', JSON.stringify(user));
+            return user;
+        } catch (error) {
+            // Extract error message from various possible formats
+            const errorMessage = error.response?.data?.message || error.message || 'Signup failed';
+            throw new Error(errorMessage);
         }
     };
 
     const logout = async () => {
         try {
             await services.auth.logout();
-            setUser(null);
-            // Redirect is handled in component or Router, but we can force it here if strictly needed
-            // window.location.href = '/login'; 
         } catch (error) {
             console.error("Logout error", error);
+        } finally {
+            // Always clear user state and localStorage, even if API call fails
+            setUser(null);
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            // Redirect to login page
+            window.location.href = '/login';
         }
     };
 

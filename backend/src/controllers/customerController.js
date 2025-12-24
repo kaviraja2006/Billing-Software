@@ -66,7 +66,18 @@ const updateCustomer = asyncHandler(async (req, res) => {
         customer.address = req.body.address || customer.address;
 
         const updatedCustomer = await customer.save();
-        res.json(updatedCustomer);
+        res.json({
+            id: updatedCustomer._id,
+            name: updatedCustomer.name,
+            email: updatedCustomer.email,
+            phone: updatedCustomer.phone,
+            address: updatedCustomer.address,
+            totalVisits: updatedCustomer.totalVisits,
+            totalSpent: updatedCustomer.totalSpent,
+            due: updatedCustomer.due,
+            createdAt: updatedCustomer.createdAt,
+            updatedAt: updatedCustomer.updatedAt
+        });
     } else {
         res.status(404);
         throw new Error('Customer not found');

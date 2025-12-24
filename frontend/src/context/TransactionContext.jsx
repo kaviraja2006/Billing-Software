@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import services from '../services/api';
+import { useAuth } from './AuthContext';
 
 const TransactionContext = createContext();
 
@@ -17,18 +18,28 @@ export const TransactionProvider = ({ children }) => {
         const saved = localStorage.getItem('heldBills');
         return saved ? JSON.parse(saved) : [];
     });
+    const { user, isLoading: authLoading } = useAuth();
 
     useEffect(() => {
+        // Only fetch if user is authenticated and auth is not loading
+        if (authLoading || !user) {
+            if (!user) {
+                setTransactions([]);
+            }
+            return;
+        }
+
         const fetchTransactions = async () => {
             try {
                 const response = await services.invoices.getAll();
                 setTransactions(response.data);
             } catch (error) {
                 console.error("Failed to fetch transactions", error);
+                setTransactions([]);
             }
         };
         fetchTransactions();
-    }, []);
+    }, [user, authLoading]);
 
     useEffect(() => {
         localStorage.setItem('heldBills', JSON.stringify(heldBills));

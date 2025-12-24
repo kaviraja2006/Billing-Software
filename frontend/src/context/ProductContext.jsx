@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import services from '../services/api';
+import { useAuth } from './AuthContext';
 
 export const ProductContext = createContext();
 
@@ -14,8 +15,18 @@ export const useProducts = () => {
 export const ProductProvider = ({ children }) => {
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
+    const { user, isLoading: authLoading } = useAuth();
 
     useEffect(() => {
+        // Only fetch if user is authenticated and auth is not loading
+        if (authLoading || !user) {
+            setLoading(false);
+            if (!user) {
+                setProducts([]);
+            }
+            return;
+        }
+
         const fetchProducts = async () => {
             setLoading(true);
             try {
@@ -23,12 +34,13 @@ export const ProductProvider = ({ children }) => {
                 setProducts(response.data);
             } catch (error) {
                 console.error("Failed to fetch products", error);
+                setProducts([]);
             } finally {
                 setLoading(false);
             }
         };
         fetchProducts();
-    }, []);
+    }, [user, authLoading]);
 
     const addProduct = async (productData) => {
         try {

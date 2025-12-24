@@ -31,23 +31,23 @@ const InvoiceDetailsModal = ({ isOpen, onClose, invoice }) => {
                 <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                         <p className="text-slate-500">Customer</p>
-                        <p className="font-medium text-slate-900">{invoice.customer}</p>
+                        <p className="font-medium text-slate-900">{invoice.customer || invoice.customerName || 'Walk-in Customer'}</p>
                     </div>
                     <div>
                         <p className="text-slate-500">Date</p>
-                        <p className="font-medium text-slate-900">{invoice.date}</p>
+                        <p className="font-medium text-slate-900">{invoice.date ? new Date(invoice.date).toLocaleDateString() : 'N/A'}</p>
                     </div>
                     <div>
                         <p className="text-slate-500">Payment Method</p>
-                        <p className="font-medium text-slate-900">{invoice.method}</p>
+                        <p className="font-medium text-slate-900">{invoice.method || invoice.paymentMethod || 'Cash'}</p>
                     </div>
                     <div>
                         <p className="text-slate-500">Status</p>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${invoice.status === 'Completed' ? 'bg-green-100 text-green-700' :
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${invoice.status === 'Completed' || invoice.status === 'Paid' ? 'bg-green-100 text-green-700' :
                             invoice.status === 'Pending' ? 'bg-yellow-100 text-yellow-700' :
                                 'bg-red-100 text-red-700'
                             }`}>
-                            {invoice.status}
+                            {invoice.status || 'Paid'}
                         </span>
                     </div>
                 </div>
@@ -69,8 +69,8 @@ const InvoiceDetailsModal = ({ isOpen, onClose, invoice }) => {
                                     <TableRow key={idx}>
                                         <TableCell className="font-medium">{item.name}</TableCell>
                                         <TableCell className="text-center">{item.quantity}</TableCell>
-                                        <TableCell className="text-right">${item.price.toFixed(2)}</TableCell>
-                                        <TableCell className="text-right">${(item.price * item.quantity).toFixed(2)}</TableCell>
+                                        <TableCell className="text-right">${(typeof item.price === 'number' ? item.price : parseFloat(item.price || 0)).toFixed(2)}</TableCell>
+                                        <TableCell className="text-right">${(typeof item.total === 'number' ? item.total : (parseFloat(item.price || 0) * (item.quantity || 0))).toFixed(2)}</TableCell>
                                     </TableRow>
                                 ))
                             ) : (
@@ -97,7 +97,7 @@ const InvoiceDetailsModal = ({ isOpen, onClose, invoice }) => {
                         </div>
                         <div className="flex justify-between text-lg font-bold border-t pt-2">
                             <span>Total</span>
-                            <span>{invoice.amount}</span>
+                            <span>${(invoice.total || invoice.amount || 0).toFixed(2)}</span>
                         </div>
                     </div>
                 </div>
