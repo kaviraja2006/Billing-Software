@@ -9,12 +9,11 @@ const Product = require('../models/productModel');
 // @access  Private
 const getDashboardStats = asyncHandler(async (req, res) => {
     // Parallel execution for performance
-    const [totalSalesResult, activeCustomers, totalOrders, pendingInvoices, lowStockResult] = await Promise.all([
+    const [totalSalesResult, activeCustomers, pendingInvoices, lowStockResult] = await Promise.all([
         Invoice.aggregate([
             { $group: { _id: null, total: { $sum: "$total" } } }
         ]),
         Customer.countDocuments({}), // Assuming all are active
-        Invoice.countDocuments({}), // Total Orders
         Invoice.countDocuments({ status: 'Pending' }), // If we use 'Pending' status. Default is 'Paid'.
         Product.countDocuments({ stock: { $lt: 10 } }) // Low stock threshold 10
     ]);
@@ -23,7 +22,6 @@ const getDashboardStats = asyncHandler(async (req, res) => {
 
     res.json({
         totalSales,
-        totalOrders,
         activeCustomers,
         pendingInvoices,
         lowStockItems: lowStockResult

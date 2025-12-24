@@ -26,12 +26,9 @@ const ProductsPage = () => {
     }, [products]);
 
     const filteredProducts = products.filter(p =>
-        (!selectedCategory || p.category === selectedCategory) &&
-        (
-            (p.name && p.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-            (p.category && p.category.toLowerCase().includes(searchTerm.toLowerCase())) ||
-            (p.barcode && p.barcode.toString().includes(searchTerm))
-        )
+        (p.name && p.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (p.category && p.category.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (p.barcode && p.barcode.toString().includes(searchTerm))
     );
 
     const handleEdit = (product) => {
@@ -157,21 +154,8 @@ const ProductsPage = () => {
                             />
                         </div>
                         <div className="flex gap-2">
-                            <Button
-                                variant={selectedCategory ? "default" : "outline"}
-                                className="w-full sm:w-auto"
-                                onClick={() => setIsCategoryWizardOpen(true)}
-                            >
-                                <Filter className="mr-2 h-4 w-4" />
-                                {selectedCategory ? selectedCategory : 'Category'}
-                                {selectedCategory && (
-                                    <span
-                                        className="ml-2 hover:text-red-200"
-                                        onClick={(e) => { e.stopPropagation(); setSelectedCategory(null); }}
-                                    >
-                                        ×
-                                    </span>
-                                )}
+                            <Button variant="outline" className="w-full sm:w-auto">
+                                <Filter className="mr-2 h-4 w-4" /> Category
                             </Button>
                             <Button variant="outline" className="w-full sm:w-auto">
                                 <Filter className="mr-2 h-4 w-4" /> Stock Status
@@ -244,13 +228,6 @@ const ProductsPage = () => {
                         onClose={() => setIsDrawerOpen(false)}
                         product={selectedProduct}
                         onSave={handleSaveProduct}
-                    />
-
-                    <CategoryWizard
-                        isOpen={isCategoryWizardOpen}
-                        onClose={() => setIsCategoryWizardOpen(false)}
-                        categories={uniqueCategories}
-                        onSelectCategory={setSelectedCategory}
                     />
                 </>
             )}

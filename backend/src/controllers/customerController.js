@@ -7,20 +7,7 @@ const Joi = require('joi');
 // @access  Private
 const getCustomers = asyncHandler(async (req, res) => {
     const customers = await Customer.find({}).sort({ createdAt: -1 });
-    // Map to include 'id' field for frontend consistency
-    const response = customers.map(c => ({
-        id: c._id,
-        name: c.name,
-        email: c.email,
-        phone: c.phone,
-        address: c.address,
-        totalVisits: c.totalVisits,
-        totalSpent: c.totalSpent,
-        due: c.due,
-        createdAt: c.createdAt,
-        updatedAt: c.updatedAt
-    }));
-    res.json(response);
+    res.json(customers);
 });
 
 // @desc    Get single customer
@@ -30,20 +17,7 @@ const getCustomerById = asyncHandler(async (req, res) => {
     const customer = await Customer.findById(req.params.id);
 
     if (customer) {
-        // Return with 'id' field
-        const response = {
-            id: customer._id,
-            name: customer.name,
-            email: customer.email,
-            phone: customer.phone,
-            address: customer.address,
-            totalVisits: customer.totalVisits,
-            totalSpent: customer.totalSpent,
-            due: customer.due,
-            createdAt: customer.createdAt,
-            updatedAt: customer.updatedAt
-        };
-        res.json(response);
+        res.json(customer);
     } else {
         res.status(404);
         throw new Error('Customer not found');
@@ -75,20 +49,8 @@ const createCustomer = asyncHandler(async (req, res) => {
         email,
         address,
     });
-    // Return with 'id' field
-    const response = {
-        id: customer._id,
-        name: customer.name,
-        email: customer.email,
-        phone: customer.phone,
-        address: customer.address,
-        totalVisits: customer.totalVisits,
-        totalSpent: customer.totalSpent,
-        due: customer.due,
-        createdAt: customer.createdAt,
-        updatedAt: customer.updatedAt
-    };
-    res.status(201).json(response);
+
+    res.status(201).json(customer);
 });
 
 // @desc    Update a customer
