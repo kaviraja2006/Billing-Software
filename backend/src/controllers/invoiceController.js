@@ -8,16 +8,17 @@ const Joi = require('joi');
 // @route   GET /invoices
 // @access  Private
 const getInvoices = asyncHandler(async (req, res) => {
-    const invoices = await Invoice.find({}).sort({ date: -1 });
+    // Filter invoices by authenticated user's ID
+    const invoices = await Invoice.find({ userId: req.user._id }).sort({ date: -1 });
     const response = invoices.map(inv => ({
         id: inv._id,
         customerName: inv.customerName,
-        customer: inv.customerName, // For frontend compatibility
+        customer: inv.customerName,
         date: inv.date,
         total: inv.total,
-        amount: inv.total, // For frontend compatibility
+        amount: inv.total,
         status: inv.status,
-        method: inv.paymentMethod || 'Cash', // For frontend compatibility
+        method: inv.paymentMethod || 'Cash',
         paymentMethod: inv.paymentMethod || 'Cash'
     }));
     res.json(response);
@@ -27,13 +28,14 @@ const getInvoices = asyncHandler(async (req, res) => {
 // @route   GET /invoices/:id
 // @access  Private
 const getInvoiceById = asyncHandler(async (req, res) => {
-    const invoice = await Invoice.findById(req.params.id);
+    // Verify ownership
+    const invoice = await Invoice.findOne({ _id: req.params.id, userId: req.user._id });
 
     if (invoice) {
         res.json({
             id: invoice._id,
             customerName: invoice.customerName,
-            customer: invoice.customerName, // For frontend compatibility
+            customer: invoice.customerName,
             customerId: invoice.customerId,
             date: invoice.date,
             items: invoice.items.map(item => ({
@@ -47,11 +49,11 @@ const getInvoiceById = asyncHandler(async (req, res) => {
             tax: invoice.tax,
             discount: invoice.discount,
             total: invoice.total,
-            amount: invoice.total, // For frontend compatibility
+            amount: invoice.total,
             status: invoice.status,
-            method: invoice.paymentMethod || 'Cash', // For frontend compatibility
+            method: invoice.paymentMethod || 'Cash',
             paymentMethod: invoice.paymentMethod || 'Cash',
-            totals: { // For frontend compatibility
+            totals: {
                 subtotal: invoice.subtotal,
                 tax: invoice.tax,
                 discount: invoice.discount,
@@ -60,7 +62,7 @@ const getInvoiceById = asyncHandler(async (req, res) => {
         });
     } else {
         res.status(404);
-        throw new Error('Invoice not found');
+        throw new Error('Invoice not found or unauthorized');
     }
 });
 
@@ -100,12 +102,12 @@ const createInvoice = asyncHandler(async (req, res) => {
     let calcSubtotal = 0;
     const finalItems = [];
 
-    // We need to process items sequentially to check stock and deduct
+    // Process items - verify user owns the products
     for (const item of items) {
-        const product = await Product.findById(item.productId);
+        const product = await Product.findOne({ _id: item.productId, userId: req.user._id });
         if (!product) {
             res.status(400);
-            throw new Error(`Product not found: ${item.name}`);
+            throw new Error(`Product not found or unauthorized: ${item.name}`);
         }
 
         if (product.stock < item.quantity) {
@@ -152,6 +154,7 @@ const createInvoice = asyncHandler(async (req, res) => {
 
     const calcTotal = subtotal + tax - discount;
 
+    // Attach user ID
     const invoice = await Invoice.create({
         customerId: customerId || null,
         customerName,
@@ -162,12 +165,13 @@ const createInvoice = asyncHandler(async (req, res) => {
         discount,
         total: calcTotal,
         status: 'Paid',
-        paymentMethod
+        paymentMethod,
+        userId: req.user._id
     });
 
-    // Update Customer Stats if customerId exists
+    // Update Customer Stats if customerId exists (and user owns the customer)
     if (customerId) {
-        const customer = await Customer.findById(customerId);
+        const customer = await Customer.findOne({ _id: customerId, userId: req.user._id });
         if (customer) {
             customer.totalSpent += calcTotal;
             customer.totalVisits += 1;
@@ -203,21 +207,22 @@ const createInvoice = asyncHandler(async (req, res) => {
 // @route   DELETE /invoices/:id
 // @access  Private
 const deleteInvoice = asyncHandler(async (req, res) => {
-    const invoice = await Invoice.findById(req.params.id);
+    // Verify ownership
+    const invoice = await Invoice.findOne({ _id: req.params.id, userId: req.user._id });
 
     if (invoice) {
-        // Restore stock for items in the invoice
+        // Restore stock for user's products only
         for (const item of invoice.items) {
-            const product = await Product.findById(item.productId);
+            const product = await Product.findOne({ _id: item.productId, userId: req.user._id });
             if (product) {
                 product.stock += item.quantity;
                 await product.save();
             }
         }
 
-        // Update customer stats if customer exists
+        // Update customer stats if customer exists and user owns it
         if (invoice.customerId) {
-            const customer = await Customer.findById(invoice.customerId);
+            const customer = await Customer.findOne({ _id: invoice.customerId, userId: req.user._id });
             if (customer) {
                 customer.totalSpent = Math.max(0, customer.totalSpent - invoice.total);
                 customer.totalVisits = Math.max(0, customer.totalVisits - 1);
@@ -229,7 +234,7 @@ const deleteInvoice = asyncHandler(async (req, res) => {
         res.json({ message: 'Invoice deleted successfully' });
     } else {
         res.status(404);
-        throw new Error('Invoice not found');
+        throw new Error('Invoice not found or unauthorized');
     }
 });
 

@@ -3,20 +3,24 @@ const Invoice = require('../models/invoiceModel');
 const Expense = require('../models/expenseModel');
 const Customer = require('../models/customerModel');
 const Product = require('../models/productModel');
+const mongoose = require('mongoose');
 
 // @desc    Get dashboard stats
 // @route   GET /reports/dashboard
 // @access  Private
 const getDashboardStats = asyncHandler(async (req, res) => {
-    // Parallel execution for performance
-    const [totalSalesResult, activeCustomers, totalOrders, pendingInvoices, lowStockResult] = await Promise.all([
+    const userId = req.user._id;
+
+    // All queries filtered by userId
+    const [totalSalesResult, activetCustomers, totalOrders, pendingInvoices, lowStockResult] = await Promise.all([
         Invoice.aggregate([
+            { $match: { userId: mongoose.Types.ObjectId(userId) } },
             { $group: { _id: null, total: { $sum: "$total" } } }
         ]),
-        Customer.countDocuments({}), // Assuming all are active
-        Invoice.countDocuments({}), // Total Orders
-        Invoice.countDocuments({ status: 'Pending' }), // If we use 'Pending' status. Default is 'Paid'.
-        Product.countDocuments({ stock: { $lt: 10 } }) // Low stock threshold 10
+        Customer.countDocuments({ userId }),
+        Invoice.countDocuments({ userId }),
+        Invoice.countDocuments({ userId, status: 'Pending' }),
+        Product.countDocuments({ userId, stock: { $lt: 10 } })
     ]);
 
     const totalSales = totalSalesResult[0] ? totalSalesResult[0].total : 0;
@@ -30,28 +34,29 @@ const getDashboardStats = asyncHandler(async (req, res) => {
     });
 });
 
-// @desc    Get financials
+// @desc    Get financials  
 // @route   GET /reports/financials
 // @access  Private
 const getFinancials = asyncHandler(async (req, res) => {
+    const userId = req.user._id;
+
     const [salesResult, expensesResult, countResult] = await Promise.all([
         Invoice.aggregate([
+            { $match: { userId: mongoose.Types.ObjectId(userId) } },
             { $group: { _id: null, total: { $sum: "$total" }, count: { $sum: 1 } } }
         ]),
         Expense.aggregate([
+            { $match: { userId: mongoose.Types.ObjectId(userId) } },
             { $group: { _id: null, total: { $sum: "$amount" } } }
         ]),
-        Invoice.countDocuments({})
+        Invoice.countDocuments({ userId })
     ]);
 
     const totalSales = salesResult[0] ? salesResult[0].total : 0;
     const totalOrders = countResult;
     const totalExpenses = expensesResult[0] ? expensesResult[0].total : 0;
 
-    // Avg Order Value
     const avgOrderValue = totalOrders > 0 ? totalSales / totalOrders : 0;
-
-    // Net Profit
     const netProfit = totalSales - totalExpenses;
 
     res.json({
@@ -67,15 +72,17 @@ const getFinancials = asyncHandler(async (req, res) => {
 // @route   GET /reports/sales-trend
 // @access  Private
 const getSalesTrend = asyncHandler(async (req, res) => {
-    // Group by YYYY-MM-DD
+    const userId = req.user._id;
+
     const trend = await Invoice.aggregate([
+        { $match: { userId: mongoose.Types.ObjectId(userId) } },
         {
             $group: {
                 _id: { $dateToString: { format: "%Y-%m-%d", date: "$date" } },
                 sales: { $sum: "$total" }
             }
         },
-        { $sort: { _id: 1 } }, // asc date
+        { $sort: { _id: 1 } },
         {
             $project: {
                 date: "$_id",
@@ -92,11 +99,14 @@ const getSalesTrend = asyncHandler(async (req, res) => {
 // @route   GET /reports/payment-methods
 // @access  Private
 const getPaymentMethods = asyncHandler(async (req, res) => {
+    const userId = req.user._id;
+
     const stats = await Invoice.aggregate([
+        { $match: { userId: mongoose.Types.ObjectId(userId) } },
         {
             $group: {
-                _id: "$paymentMethod", // Requires paymentMethod in Schema (added tentatively or handling null)
-                value: { $sum: "$total" } // value is total sales by method? or count? usually sales amount.
+                _id: "$paymentMethod",
+                value: { $sum: "$total" }
             }
         },
         {
@@ -114,13 +124,16 @@ const getPaymentMethods = asyncHandler(async (req, res) => {
 // @route   GET /reports/top-products
 // @access  Private
 const getTopProducts = asyncHandler(async (req, res) => {
+    const userId = req.user._id;
+
     const topProducts = await Invoice.aggregate([
+        { $match: { userId: mongoose.Types.ObjectId(userId) } },
         { $unwind: "$items" },
         {
             $group: {
-                _id: "$items.name", // or productId and name
+                _id: "$items.name",
                 quantity: { $sum: "$items.quantity" },
-                revenue: { $sum: "$items.total" } // item total
+                revenue: { $sum: "$items.total" }
             }
         },
         { $sort: { revenue: -1 } },

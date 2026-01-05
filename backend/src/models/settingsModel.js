@@ -42,6 +42,12 @@ const settingsSchema = mongoose.Schema(
         defaults: {
             hsnCode: { type: String, default: '' },
         },
+        userId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            required: true,
+            unique: true  // One settings document per user
+        },
     },
     {
         timestamps: true,

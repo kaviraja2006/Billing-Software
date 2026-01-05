@@ -9,6 +9,11 @@ const customerSchema = mongoose.Schema(
         totalVisits: { type: Number, default: 0 },
         totalSpent: { type: Number, default: 0 },
         due: { type: Number, default: 0 },
+        userId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            required: true
+        },
     },
     {
         timestamps: true,

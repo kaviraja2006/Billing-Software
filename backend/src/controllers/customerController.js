@@ -6,8 +6,8 @@ const Joi = require('joi');
 // @route   GET /customers
 // @access  Private
 const getCustomers = asyncHandler(async (req, res) => {
-    const customers = await Customer.find({}).sort({ createdAt: -1 });
-    // Map to include 'id' field for frontend consistency
+    // Filter customers by authenticated user's ID
+    const customers = await Customer.find({ userId: req.user._id }).sort({ createdAt: -1 });
     const response = customers.map(c => ({
         id: c._id,
         name: c.name,
@@ -27,10 +27,10 @@ const getCustomers = asyncHandler(async (req, res) => {
 // @route   GET /customers/:id
 // @access  Private
 const getCustomerById = asyncHandler(async (req, res) => {
-    const customer = await Customer.findById(req.params.id);
+    // Verify ownership
+    const customer = await Customer.findOne({ _id: req.params.id, userId: req.user._id });
 
     if (customer) {
-        // Return with 'id' field
         const response = {
             id: customer._id,
             name: customer.name,
@@ -46,7 +46,7 @@ const getCustomerById = asyncHandler(async (req, res) => {
         res.json(response);
     } else {
         res.status(404);
-        throw new Error('Customer not found');
+        throw new Error('Customer not found or unauthorized');
     }
 });
 
@@ -69,13 +69,14 @@ const createCustomer = asyncHandler(async (req, res) => {
         throw new Error(error.details[0].message);
     }
 
+    // Attach user ID
     const customer = await Customer.create({
         name,
         phone,
         email,
         address,
+        userId: req.user._id
     });
-    // Return with 'id' field
     const response = {
         id: customer._id,
         name: customer.name,
@@ -95,7 +96,8 @@ const createCustomer = asyncHandler(async (req, res) => {
 // @route   PUT /customers/:id
 // @access  Private
 const updateCustomer = asyncHandler(async (req, res) => {
-    const customer = await Customer.findById(req.params.id);
+    // Verify ownership
+    const customer = await Customer.findOne({ _id: req.params.id, userId: req.user._id });
 
     if (customer) {
         customer.name = req.body.name || customer.name;
@@ -118,7 +120,7 @@ const updateCustomer = asyncHandler(async (req, res) => {
         });
     } else {
         res.status(404);
-        throw new Error('Customer not found');
+        throw new Error('Customer not found or unauthorized');
     }
 });
 
@@ -126,14 +128,15 @@ const updateCustomer = asyncHandler(async (req, res) => {
 // @route   DELETE /customers/:id
 // @access  Private
 const deleteCustomer = asyncHandler(async (req, res) => {
-    const customer = await Customer.findById(req.params.id);
+    // Verify ownership
+    const customer = await Customer.findOne({ _id: req.params.id, userId: req.user._id });
 
     if (customer) {
         await customer.deleteOne();
         res.json({ message: 'Customer deleted successfully' });
     } else {
         res.status(404);
-        throw new Error('Customer not found');
+        throw new Error('Customer not found or unauthorized');
     }
 });
 

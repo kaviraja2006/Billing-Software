@@ -17,6 +17,11 @@ const productSchema = mongoose.Schema(
         taxRate: { type: Number, default: 0 },
         costPrice: { type: Number, default: 0 },
         minStock: { type: Number, default: 10 },
+        userId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            required: true
+        },
     },
     {
         timestamps: true,
