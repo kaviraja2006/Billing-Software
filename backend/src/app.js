@@ -18,13 +18,25 @@ const app = express();
 // Middleware
 app.use(helmet());
 app.use(cors({
-    origin: [
-        'http://localhost:5173',
-        'http://localhost:3000',
-        'http://localhost:5174',
-        'https://billing-software-trqu-p16ng89ii-kaviraja2006s-projects.vercel.app',
-        'https://billing-software-trqu.vercel.app'
-    ],
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl)
+        if (!origin) return callback(null, true);
+
+        // Allowed origins
+        const allowedOrigins = [
+            'http://localhost:5173',
+            'http://localhost:3000',
+            'http://localhost:5174',
+            'https://billing-software-trqu.vercel.app'
+        ];
+
+        // Check if origin is in allowed list or is a Vercel preview deployment
+        if (allowedOrigins.indexOf(origin) !== -1 || origin.includes('vercel.app')) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     credentials: true
 }));
 app.use(express.json());
