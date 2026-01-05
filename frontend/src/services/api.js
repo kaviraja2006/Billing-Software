@@ -38,7 +38,7 @@ api.interceptors.response.use(
         if (!error.response) {
             console.error('Network error: Backend server may not be running. Please ensure the backend is started on port 5001.');
         }
-        
+
         if (error.response && error.response.status === 401) {
             // Only redirect if not already on login page
             if (!window.location.pathname.includes('/login')) {
