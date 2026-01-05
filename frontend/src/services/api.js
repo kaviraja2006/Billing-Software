@@ -9,7 +9,7 @@ import { mockReportService } from './mock/reports'; // Will create later
 import { mockSettingsService } from './mock/settings'; // Will create later
 
 const USE_MOCK = false; // Set to true to use mock services, false to use real API
-const API_BASE_URL = 'http://localhost:5001'; // Placeholder for real backend
+const API_BASE_URL = 'https://billing-software-bay-seven.vercel.app'; // Placeholder for real backend
 
 const api = axios.create({
     baseURL: API_BASE_URL,
