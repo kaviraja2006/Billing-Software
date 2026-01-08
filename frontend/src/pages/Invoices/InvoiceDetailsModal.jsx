@@ -69,8 +69,8 @@ const InvoiceDetailsModal = ({ isOpen, onClose, invoice }) => {
                                     <TableRow key={idx}>
                                         <TableCell className="font-medium">{item.name}</TableCell>
                                         <TableCell className="text-center">{item.quantity}</TableCell>
-                                        <TableCell className="text-right">${(typeof item.price === 'number' ? item.price : parseFloat(item.price || 0)).toFixed(2)}</TableCell>
-                                        <TableCell className="text-right">${(typeof item.total === 'number' ? item.total : (parseFloat(item.price || 0) * (item.quantity || 0))).toFixed(2)}</TableCell>
+                                        <TableCell className="text-right">₹{(typeof item.price === 'number' ? item.price : parseFloat(item.price || 0)).toFixed(2)}</TableCell>
+                                        <TableCell className="text-right">₹{(typeof item.total === 'number' ? item.total : (parseFloat(item.price || 0) * (item.quantity || 0))).toFixed(2)}</TableCell>
                                     </TableRow>
                                 ))
                             ) : (
@@ -89,15 +89,15 @@ const InvoiceDetailsModal = ({ isOpen, onClose, invoice }) => {
                     <div className="w-1/2 space-y-2">
                         <div className="flex justify-between text-sm">
                             <span className="text-slate-500">Subtotal</span>
-                            <span className="font-medium">${invoice.totals?.subtotal?.toFixed(2) || parseAmount(invoice.amount).toFixed(2)}</span>
+                            <span className="font-medium">₹{invoice.totals?.subtotal?.toFixed(2) || parseAmount(invoice.amount).toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between text-sm">
                             <span className="text-slate-500">Tax</span>
-                            <span className="font-medium">${invoice.totals?.tax?.toFixed(2) || '0.00'}</span>
+                            <span className="font-medium">₹{invoice.totals?.tax?.toFixed(2) || '0.00'}</span>
                         </div>
                         <div className="flex justify-between text-lg font-bold border-t pt-2">
                             <span>Total</span>
-                            <span>${(invoice.total || invoice.amount || 0).toFixed(2)}</span>
+                            <span>₹{(invoice.total || invoice.amount || 0).toFixed(2)}</span>
                         </div>
                     </div>
                 </div>

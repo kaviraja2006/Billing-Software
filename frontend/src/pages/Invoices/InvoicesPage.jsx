@@ -104,7 +104,7 @@ const InvoicesPage = () => {
                                             <TableCell className="font-medium text-blue-600">{invoice.id}</TableCell>
                                             <TableCell>{invoice.date ? new Date(invoice.date).toLocaleDateString() : 'N/A'}</TableCell>
                                             <TableCell>{invoice.customer || invoice.customerName || 'Walk-in Customer'}</TableCell>
-                                            <TableCell className="font-bold">${(invoice.amount || invoice.total || 0).toFixed(2)}</TableCell>
+                                            <TableCell className="font-bold">₹{(invoice.amount || invoice.total || 0).toFixed(2)}</TableCell>
                                             <TableCell>
                                                 <Badge
                                                     variant={invoice.status === 'Completed' || invoice.status === 'Paid' ? 'success' : invoice.status === 'Pending' ? 'warning' : 'destructive'}

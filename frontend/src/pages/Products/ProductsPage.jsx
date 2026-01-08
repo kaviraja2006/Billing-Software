@@ -189,6 +189,7 @@ const ProductsPage = () => {
                                         <TableHead>Category</TableHead>
                                         <TableHead>Brand</TableHead>
                                         <TableHead>Price</TableHead>
+                                        <TableHead>Unit</TableHead>
                                         <TableHead>Stock</TableHead>
                                         <TableHead>Status</TableHead>
                                         <TableHead className="w-[50px]"></TableHead>
@@ -206,7 +207,8 @@ const ProductsPage = () => {
                                                 </TableCell>
                                                 <TableCell>{product.category || '-'}</TableCell>
                                                 <TableCell>{product.brand || '-'}</TableCell>
-                                                <TableCell>${product.price.toFixed(2)}</TableCell>
+                                                <TableCell>₹{product.price.toFixed(2)}</TableCell>
+                                                <TableCell>{product.unit || 'pc'}</TableCell>
                                                 <TableCell>{product.stock}</TableCell>
                                                 <TableCell>
                                                     <Badge

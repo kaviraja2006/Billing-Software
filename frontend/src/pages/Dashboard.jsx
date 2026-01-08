@@ -7,7 +7,7 @@ import {
     TrendingUp,
     Users,
     Package,
-    DollarSign,
+    IndianRupee,
     MoreHorizontal,
     ArrowUpRight,
     ArrowDownRight,
@@ -71,9 +71,9 @@ const Dashboard = () => {
     const stats = [
         {
             title: 'Total Sales',
-            value: `$${statsData.totalSales.toFixed(2)}`,
+            value: `₹${statsData.totalSales.toFixed(2)}`,
             change: '+12.5%',
-            icon: DollarSign,
+            icon: IndianRupee,
             color: 'bg-green-600', // Ensuring standard green
         },
         {
@@ -92,7 +92,7 @@ const Dashboard = () => {
         },
         {
             title: 'Total Expenses',
-            value: `$${(expenseStats?.totalExpenses || 0).toFixed(2)}`,
+            value: `₹${(expenseStats?.totalExpenses || 0).toFixed(2)}`,
             change: '-3.1%',
             icon: TrendingUp,
             color: 'bg-orange-500',
@@ -162,7 +162,7 @@ const Dashboard = () => {
                                                     {order.status}
                                                 </Badge>
                                             </TableCell>
-                                            <TableCell className="text-right">${Number(order.total || order.amount).toFixed(2)}</TableCell>
+                                            <TableCell className="text-right">₹{Number(order.total || order.amount).toFixed(2)}</TableCell>
                                             <TableCell>
                                                 <Button variant="ghost" size="icon" className="h-8 w-8">
                                                     <MoreHorizontal size={16} />

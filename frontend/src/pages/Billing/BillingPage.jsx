@@ -284,7 +284,7 @@ const BillingPage = () => {
         updateCurrentBill({ remarks: text });
     };
 
-    const handleSavePrint = async () => {
+    const handleSavePrint = async (format = '80mm') => {
         if (currentBill.cart.length === 0) {
             alert("Cart is empty!");
             return;
@@ -316,7 +316,7 @@ const BillingPage = () => {
             const savedBill = await addTransaction(payload);
 
             // Print the receipt
-            printReceipt(savedBill);
+            printReceipt(savedBill, format);
 
             // alert("Bill Saved Successfully!"); // Optional, print dialog is enough feedback? Keep for now.
             closeBill(activeBillId); // Reset/Close after save

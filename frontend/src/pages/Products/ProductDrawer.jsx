@@ -17,7 +17,8 @@ const ProductDrawer = ({ isOpen, onClose, product, onSave }) => {
         barcode: '',
         taxRate: 0,
         costPrice: '',
-        minStock: 10
+        minStock: 10,
+        unit: 'pc'
     });
 
     // Populate form on edit
@@ -32,7 +33,8 @@ const ProductDrawer = ({ isOpen, onClose, product, onSave }) => {
                 barcode: product.barcode || '',
                 taxRate: product.taxRate || 0,
                 costPrice: product.costPrice || '',
-                minStock: product.minStock || 10
+                minStock: product.minStock || 10,
+                unit: product.unit || 'pc'
             });
         } else if (!product && isOpen) {
             setFormData({
@@ -44,7 +46,8 @@ const ProductDrawer = ({ isOpen, onClose, product, onSave }) => {
                 barcode: '',
                 taxRate: 0,
                 costPrice: '',
-                minStock: 10
+                minStock: 10,
+                unit: 'pc'
             });
         }
     }, [product, isOpen]);
@@ -99,6 +102,37 @@ const ProductDrawer = ({ isOpen, onClose, product, onSave }) => {
 
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
+                            <label className="text-sm font-medium text-slate-700">Unit</label>
+                            <select
+                                name="unit"
+                                value={formData.unit}
+                                onChange={handleChange}
+                                className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                <option value="pc">Piece (pc)</option>
+                                <option value="kg">Kilogram (kg)</option>
+                                <option value="g">Gram (g)</option>
+                                <option value="l">Litre (l)</option>
+                                <option value="ml">Millilitre (ml)</option>
+                                <option value="pack">Pack</option>
+                                <option value="box">Box</option>
+                                <option value="dozen">Dozen</option>
+                                <option value="meter">Meter</option>
+                            </select>
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-slate-700">Barcode / SKU</label>
+                            <Input
+                                name="barcode"
+                                placeholder="Scan or enter barcode"
+                                value={formData.barcode}
+                                onChange={handleChange}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
                             <label className="text-sm font-medium text-slate-700">Selling Price</label>
                             <Input
                                 name="price"
@@ -128,15 +162,6 @@ const ProductDrawer = ({ isOpen, onClose, product, onSave }) => {
                                 type="number"
                                 placeholder="0"
                                 value={formData.taxRate}
-                                onChange={handleChange}
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-slate-700">Barcode / SKU</label>
-                            <Input
-                                name="barcode"
-                                placeholder="Scan or enter barcode"
-                                value={formData.barcode}
                                 onChange={handleChange}
                             />
                         </div>

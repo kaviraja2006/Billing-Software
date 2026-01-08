@@ -107,10 +107,10 @@ const CustomersPage = () => {
                                         </div>
                                     </TableCell>
                                     <TableCell className="text-center">{customer.totalVisits || 0}</TableCell>
-                                    <TableCell className="text-right">${(customer.totalSpent || 0).toFixed(2)}</TableCell>
+                                    <TableCell className="text-right">₹{(customer.totalSpent || 0).toFixed(2)}</TableCell>
                                     <TableCell className="text-right">
                                         {(customer.due || 0) > 0 ? (
-                                            <span className="text-red-600 font-medium">${(customer.due || 0).toFixed(2)}</span>
+                                            <span className="text-red-600 font-medium">₹{(customer.due || 0).toFixed(2)}</span>
                                         ) : (
                                             <span className="text-slate-400">-</span>
                                         )}
