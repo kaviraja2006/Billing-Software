@@ -84,64 +84,66 @@ const InvoicesPage = () => {
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <Table>
-                        <TableHeader>
-                            <TableRow className="hover:bg-transparent">
-                                <TableHead>Invoice ID</TableHead>
-                                <TableHead>Date</TableHead>
-                                <TableHead>Customer</TableHead>
-                                <TableHead>Amount</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead>Method</TableHead>
-                                <TableHead className="text-right">Actions</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {filteredTransactions.length > 0 ? (
-                                filteredTransactions.map((invoice) => (
-                                    <TableRow key={invoice.id}>
-                                        <TableCell className="font-medium text-blue-600">{invoice.id}</TableCell>
-                                        <TableCell>{invoice.date ? new Date(invoice.date).toLocaleDateString() : 'N/A'}</TableCell>
-                                        <TableCell>{invoice.customer || invoice.customerName || 'Walk-in Customer'}</TableCell>
-                                        <TableCell className="font-bold">${(invoice.amount || invoice.total || 0).toFixed(2)}</TableCell>
-                                        <TableCell>
-                                            <Badge
-                                                variant={invoice.status === 'Completed' || invoice.status === 'Paid' ? 'success' : invoice.status === 'Pending' ? 'warning' : 'destructive'}
-                                                className="bg-opacity-15 text-opacity-100"
-                                            >
-                                                {invoice.status || 'Paid'}
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell>{invoice.method || invoice.paymentMethod || 'Cash'}</TableCell>
-                                        <TableCell className="text-right">
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => handleViewInvoice(invoice)}
-                                                className="h-8 w-8 p-0"
-                                            >
-                                                <Eye className="h-4 w-4 text-slate-500 hover:text-blue-600" />
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => handleDelete(invoice.id)}
-                                                className="h-8 w-8 p-0"
-                                            >
-                                                <Trash2 className="h-4 w-4 text-slate-500 hover:text-red-600" />
-                                            </Button>
+                    <div className="overflow-x-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow className="hover:bg-transparent">
+                                    <TableHead>Invoice ID</TableHead>
+                                    <TableHead>Date</TableHead>
+                                    <TableHead>Customer</TableHead>
+                                    <TableHead>Amount</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead>Method</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {filteredTransactions.length > 0 ? (
+                                    filteredTransactions.map((invoice) => (
+                                        <TableRow key={invoice.id}>
+                                            <TableCell className="font-medium text-blue-600">{invoice.id}</TableCell>
+                                            <TableCell>{invoice.date ? new Date(invoice.date).toLocaleDateString() : 'N/A'}</TableCell>
+                                            <TableCell>{invoice.customer || invoice.customerName || 'Walk-in Customer'}</TableCell>
+                                            <TableCell className="font-bold">${(invoice.amount || invoice.total || 0).toFixed(2)}</TableCell>
+                                            <TableCell>
+                                                <Badge
+                                                    variant={invoice.status === 'Completed' || invoice.status === 'Paid' ? 'success' : invoice.status === 'Pending' ? 'warning' : 'destructive'}
+                                                    className="bg-opacity-15 text-opacity-100"
+                                                >
+                                                    {invoice.status || 'Paid'}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell>{invoice.method || invoice.paymentMethod || 'Cash'}</TableCell>
+                                            <TableCell className="text-right">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => handleViewInvoice(invoice)}
+                                                    className="h-8 w-8 p-0"
+                                                >
+                                                    <Eye className="h-4 w-4 text-slate-500 hover:text-blue-600" />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => handleDelete(invoice.id)}
+                                                    className="h-8 w-8 p-0"
+                                                >
+                                                    <Trash2 className="h-4 w-4 text-slate-500 hover:text-red-600" />
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                ) : (
+                                    <TableRow>
+                                        <TableCell colSpan={7} className="text-center py-8 text-slate-500">
+                                            No invoices found matching your search.
                                         </TableCell>
                                     </TableRow>
-                                ))
-                            ) : (
-                                <TableRow>
-                                    <TableCell colSpan={7} className="text-center py-8 text-slate-500">
-                                        No invoices found matching your search.
-                                    </TableCell>
-                                </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
                 </CardContent>
             </Card>
 

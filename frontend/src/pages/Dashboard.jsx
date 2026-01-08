@@ -34,16 +34,9 @@ const StatCard = ({ title, value, change, changeType, icon: Icon, color }) => (
                         <h3 className="text-2xl font-bold text-body-primary">{value}</h3>
                     </div>
                 </div>
-                <div className={cn(
-                    "flex items-center text-sm font-medium",
-                    changeType === 'increase' ? "text-green-600" : "text-red-600"
-                )}>
-                    {changeType === 'increase' ? <ArrowUpRight size={16} className="mr-1" /> : <ArrowDownRight size={16} className="mr-1" />}
-                    {change}
-                </div>
             </div>
         </CardContent>
-    </Card>
+    </Card >
 );
 
 const Dashboard = () => {
@@ -110,18 +103,18 @@ const Dashboard = () => {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-0">
                 <h1 className="text-2xl font-bold text-body-primary">Dashboard</h1>
-                <div className="flex gap-2">
-                    <Button onClick={() => navigate('/billing')} className="bg-primary-main hover:bg-primary-hover text-white">
+                <div className="flex gap-2 w-full md:w-auto">
+                    <Button onClick={() => navigate('/billing')} className="flex-1 md:flex-none bg-primary-main hover:bg-primary-hover text-white">
                         <ShoppingCart className="mr-2 h-4 w-4" /> New Sale
                     </Button>
-                    <Button variant="outline">Download Report</Button>
+                    <Button variant="outline" className="flex-1 md:flex-none">Download Report</Button>
                 </div>
             </div>
 
             {/* Stats Grid */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
                 {stats.map((stat, i) => (
                     <StatCard
                         key={i}
@@ -135,68 +128,71 @@ const Dashboard = () => {
                 ))}
             </div>
 
-            {/* Recent Orders */}
-            <div className="grid gap-6 md:grid-cols-7">
-                <Card className="md:col-span-4 lg:col-span-5">
+            {/* Main Content Grid */}
+            <div className="grid gap-6 grid-cols-1 md:grid-cols-7">
+                {/* Recent Orders - Order 2 on Mobile, 1 on Desktop */}
+                <Card className="order-2 md:order-1 md:col-span-4 lg:col-span-5 min-w-0">
                     <CardHeader>
                         <CardTitle>Recent Transactions</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Invoice ID</TableHead>
-                                    <TableHead>Customer</TableHead>
-                                    <TableHead>Method</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead className="text-right">Amount</TableHead>
-                                    <TableHead className="w-[50px]"></TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {recentOrders.map((order) => (
-                                    <TableRow key={order.id}>
-                                        <TableCell className="font-medium">{order.id}</TableCell>
-                                        <TableCell>{order.customerName || order.customer}</TableCell>
-                                        <TableCell>{order.method}</TableCell>
-                                        <TableCell>
-                                            <Badge
-                                                variant={order.status === 'Completed' ? 'success' : order.status === 'Pending' ? 'warning' : 'destructive'}
-                                                className="bg-opacity-15 text-opacity-100"
-                                            >
-                                                {order.status}
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell className="text-right">${Number(order.total || order.amount).toFixed(2)}</TableCell>
-                                        <TableCell>
-                                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                                                <MoreHorizontal size={16} />
-                                            </Button>
-                                        </TableCell>
+                        <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Invoice ID</TableHead>
+                                        <TableHead>Customer</TableHead>
+                                        <TableHead>Method</TableHead>
+                                        <TableHead>Status</TableHead>
+                                        <TableHead className="text-right">Amount</TableHead>
+                                        <TableHead className="w-[50px]"></TableHead>
                                     </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
+                                </TableHeader>
+                                <TableBody>
+                                    {recentOrders.map((order) => (
+                                        <TableRow key={order.id}>
+                                            <TableCell className="font-medium">{order.id}</TableCell>
+                                            <TableCell className="whitespace-nowrap">{order.customerName || order.customer}</TableCell>
+                                            <TableCell>{order.method}</TableCell>
+                                            <TableCell>
+                                                <Badge
+                                                    variant={order.status === 'Completed' ? 'success' : order.status === 'Pending' ? 'warning' : 'destructive'}
+                                                    className="bg-opacity-15 text-opacity-100"
+                                                >
+                                                    {order.status}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="text-right">${Number(order.total || order.amount).toFixed(2)}</TableCell>
+                                            <TableCell>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                                    <MoreHorizontal size={16} />
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
                     </CardContent>
                 </Card>
 
-                {/* Quick Actions / Side Panel */}
-                <Card className="md:col-span-3 lg:col-span-2">
+                {/* Quick Actions - Order 1 on Mobile, 2 on Desktop */}
+                <Card className="order-1 md:order-2 md:col-span-3 lg:col-span-2">
                     <CardHeader>
                         <CardTitle>Quick Actions</CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                        <Button className="w-full justify-start bg-slate-100 text-primary-main hover:bg-slate-200 border border-slate-200" onClick={() => navigate('/billing')}>
+                    <CardContent className="grid grid-cols-2 gap-3 md:flex md:flex-col md:space-y-4">
+                        <Button className="w-full justify-start bg-slate-100 text-primary-main hover:bg-slate-200 border border-slate-200 col-span-2 md:col-span-1" onClick={() => navigate('/billing')}>
                             <ShoppingCart className="mr-2 h-4 w-4" /> New Bill / Sale
                         </Button>
                         <Button className="w-full justify-start text-body-secondary" variant="outline" onClick={() => navigate('/products')}>
-                            <Package className="mr-2 h-4 w-4" /> Add New Product
+                            <Package className="mr-2 h-4 w-4" /> Add Product
                         </Button>
                         <Button className="w-full justify-start text-body-secondary" variant="outline" onClick={() => navigate('/customers')}>
-                            <Users className="mr-2 h-4 w-4" /> Register Customer
+                            <Users className="mr-2 h-4 w-4" /> Add Customer
                         </Button>
                         <Button className="w-full justify-start text-body-secondary" variant="outline" onClick={() => navigate('/barcode')}>
-                            <ScanBarcode className="mr-2 h-4 w-4" /> Generate Barcode
+                            <ScanBarcode className="mr-2 h-4 w-4" /> Barcode
                         </Button>
                     </CardContent>
                 </Card>

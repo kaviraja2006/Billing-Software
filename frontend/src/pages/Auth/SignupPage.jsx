@@ -49,7 +49,7 @@ const SignupPage = () => {
 
     return (
         <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-            <Card className="w-full max-w-md p-8 space-y-8 bg-white shadow-xl">
+            <Card className="w-full max-w-md p-6 md:p-8 space-y-8 bg-white shadow-xl">
                 <div className="text-center space-y-2">
                     <div className="mx-auto bg-primary-main text-white p-3 rounded-full w-fit">
                         <UserPlus size={24} />
@@ -126,8 +126,8 @@ const SignupPage = () => {
                                     type="button"
                                     onClick={() => setFormData({ ...formData, role: 'admin' })}
                                     className={`flex flex-col items-center gap-2 p-4 border-2 rounded-lg transition-all ${formData.role === 'admin'
-                                            ? 'border-red-500 bg-red-50 text-red-700'
-                                            : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                                        ? 'border-red-500 bg-red-50 text-red-700'
+                                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
                                         }`}
                                 >
                                     <Crown className="h-6 w-6" />
@@ -138,8 +138,8 @@ const SignupPage = () => {
                                     type="button"
                                     onClick={() => setFormData({ ...formData, role: 'employee' })}
                                     className={`flex flex-col items-center gap-2 p-4 border-2 rounded-lg transition-all ${formData.role === 'employee'
-                                            ? 'border-red-500 bg-red-50 text-red-700'
-                                            : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                                        ? 'border-red-500 bg-red-50 text-red-700'
+                                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
                                         }`}
                                 >
                                     <Users className="h-6 w-6" />

@@ -84,57 +84,59 @@ const CustomersPage = () => {
 
             {/* Customers Table */}
             <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Customer Name</TableHead>
-                            <TableHead>Contact Info</TableHead>
-                            <TableHead className="text-center">Visits</TableHead>
-                            <TableHead className="text-right">Total Spent</TableHead>
-                            <TableHead className="text-right">Outstanding Due</TableHead>
-                            <TableHead className="w-[50px]"></TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {filteredCustomers.map((customer) => (
-                            <TableRow key={customer.id || customer._id}>
-                                <TableCell className="font-medium text-slate-900">{customer.name}</TableCell>
-                                <TableCell>
-                                    <div className="flex flex-col text-sm text-slate-500">
-                                        <span className="flex items-center gap-1"><Phone size={12} /> {customer.phone}</span>
-                                        <span className="flex items-center gap-1"><Mail size={12} /> {customer.email || '-'}</span>
-                                    </div>
-                                </TableCell>
-                                <TableCell className="text-center">{customer.totalVisits || 0}</TableCell>
-                                <TableCell className="text-right">${(customer.totalSpent || 0).toFixed(2)}</TableCell>
-                                <TableCell className="text-right">
-                                    {(customer.due || 0) > 0 ? (
-                                        <span className="text-red-600 font-medium">${(customer.due || 0).toFixed(2)}</span>
-                                    ) : (
-                                        <span className="text-slate-400">-</span>
-                                    )}
-                                </TableCell>
-                                <TableCell>
-                                    <div className="flex items-center gap-2">
-                                        <button onClick={() => handleEdit(customer)} className="text-slate-400 hover:text-primary-main transition-colors">
-                                            <Eye size={16} />
-                                        </button>
-                                        <button onClick={() => handleDelete(customer.id)} className="text-slate-400 hover:text-red-600 transition-colors">
-                                            <Trash2 size={16} />
-                                        </button>
-                                    </div>
-                                </TableCell>
-                            </TableRow>
-                        ))}
-                        {filteredCustomers.length === 0 && (
+                <div className="overflow-x-auto">
+                    <Table>
+                        <TableHeader>
                             <TableRow>
-                                <TableCell colSpan={6} className="text-center py-8 text-slate-500">
-                                    No customers found matching your search.
-                                </TableCell>
+                                <TableHead>Customer Name</TableHead>
+                                <TableHead>Contact Info</TableHead>
+                                <TableHead className="text-center">Visits</TableHead>
+                                <TableHead className="text-right">Total Spent</TableHead>
+                                <TableHead className="text-right">Outstanding Due</TableHead>
+                                <TableHead className="w-[50px]"></TableHead>
                             </TableRow>
-                        )}
-                    </TableBody>
-                </Table>
+                        </TableHeader>
+                        <TableBody>
+                            {filteredCustomers.map((customer) => (
+                                <TableRow key={customer.id || customer._id}>
+                                    <TableCell className="font-medium text-slate-900">{customer.name}</TableCell>
+                                    <TableCell>
+                                        <div className="flex flex-col text-sm text-slate-500">
+                                            <span className="flex items-center gap-1"><Phone size={12} /> {customer.phone}</span>
+                                            <span className="flex items-center gap-1"><Mail size={12} /> {customer.email || '-'}</span>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-center">{customer.totalVisits || 0}</TableCell>
+                                    <TableCell className="text-right">${(customer.totalSpent || 0).toFixed(2)}</TableCell>
+                                    <TableCell className="text-right">
+                                        {(customer.due || 0) > 0 ? (
+                                            <span className="text-red-600 font-medium">${(customer.due || 0).toFixed(2)}</span>
+                                        ) : (
+                                            <span className="text-slate-400">-</span>
+                                        )}
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="flex items-center gap-2">
+                                            <button onClick={() => handleEdit(customer)} className="text-slate-400 hover:text-primary-main transition-colors">
+                                                <Eye size={16} />
+                                            </button>
+                                            <button onClick={() => handleDelete(customer.id)} className="text-slate-400 hover:text-red-600 transition-colors">
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                            {filteredCustomers.length === 0 && (
+                                <TableRow>
+                                    <TableCell colSpan={6} className="text-center py-8 text-slate-500">
+                                        No customers found matching your search.
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                </div>
             </div>
 
             <CustomerDrawer

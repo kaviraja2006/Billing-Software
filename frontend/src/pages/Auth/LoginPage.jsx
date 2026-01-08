@@ -36,7 +36,7 @@ const LoginPage = () => {
 
     return (
         <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-            <Card className="w-full max-w-md p-8 space-y-8 bg-white shadow-xl">
+            <Card className="w-full max-w-md p-6 md:p-8 space-y-8 bg-white shadow-xl">
                 <div className="text-center space-y-2">
                     <div className="mx-auto bg-primary-main text-white p-3 rounded-full w-fit">
                         <Lock size={24} />

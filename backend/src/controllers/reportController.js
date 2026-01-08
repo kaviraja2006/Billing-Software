@@ -12,7 +12,7 @@ const getDashboardStats = asyncHandler(async (req, res) => {
     const userId = req.user._id;
 
     // All queries filtered by userId
-    const [totalSalesResult, activetCustomers, totalOrders, pendingInvoices, lowStockResult] = await Promise.all([
+    const [totalSalesResult, activeCustomers, totalOrders, pendingInvoices, lowStockResult] = await Promise.all([
         Invoice.aggregate([
             { $match: { userId: new mongoose.Types.ObjectId(userId) } },
             { $group: { _id: null, total: { $sum: "$total" } } }

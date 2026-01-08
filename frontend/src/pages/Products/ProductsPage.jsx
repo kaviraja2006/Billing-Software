@@ -181,62 +181,64 @@ const ProductsPage = () => {
 
                     {/* Products Table */}
                     <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Product Name</TableHead>
-                                    <TableHead>Category</TableHead>
-                                    <TableHead>Brand</TableHead>
-                                    <TableHead>Price</TableHead>
-                                    <TableHead>Stock</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead className="w-[50px]"></TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {filteredProducts.map((product) => {
-                                    const stockStatus = product.stock === 0 ? 'Out of Stock' : product.stock < 10 ? 'Low Stock' : 'In Stock';
+                        <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Product Name</TableHead>
+                                        <TableHead>Category</TableHead>
+                                        <TableHead>Brand</TableHead>
+                                        <TableHead>Price</TableHead>
+                                        <TableHead>Stock</TableHead>
+                                        <TableHead>Status</TableHead>
+                                        <TableHead className="w-[50px]"></TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {filteredProducts.map((product) => {
+                                        const stockStatus = product.stock === 0 ? 'Out of Stock' : product.stock < 10 ? 'Low Stock' : 'In Stock';
 
-                                    return (
-                                        <TableRow key={product.id}>
-                                            <TableCell className="font-medium text-slate-900">
-                                                {product.name}
-                                                {product.barcode && <div className="text-xs text-slate-400">{product.barcode}</div>}
-                                            </TableCell>
-                                            <TableCell>{product.category || '-'}</TableCell>
-                                            <TableCell>{product.brand || '-'}</TableCell>
-                                            <TableCell>${product.price.toFixed(2)}</TableCell>
-                                            <TableCell>{product.stock}</TableCell>
-                                            <TableCell>
-                                                <Badge
-                                                    variant={stockStatus === 'In Stock' ? 'success' : stockStatus === 'Low Stock' ? 'warning' : 'destructive'}
-                                                    className="bg-opacity-15 text-opacity-100"
-                                                >
-                                                    {stockStatus}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex items-center gap-2">
-                                                    <button onClick={() => handleEdit(product)} className="text-slate-400 hover:text-primary-main transition-colors">
-                                                        <Edit size={16} />
-                                                    </button>
-                                                    <button onClick={() => handleDelete(product.id)} className="text-slate-400 hover:text-red-600 transition-colors">
-                                                        <Trash size={16} />
-                                                    </button>
-                                                </div>
+                                        return (
+                                            <TableRow key={product.id}>
+                                                <TableCell className="font-medium text-slate-900">
+                                                    {product.name}
+                                                    {product.barcode && <div className="text-xs text-slate-400">{product.barcode}</div>}
+                                                </TableCell>
+                                                <TableCell>{product.category || '-'}</TableCell>
+                                                <TableCell>{product.brand || '-'}</TableCell>
+                                                <TableCell>${product.price.toFixed(2)}</TableCell>
+                                                <TableCell>{product.stock}</TableCell>
+                                                <TableCell>
+                                                    <Badge
+                                                        variant={stockStatus === 'In Stock' ? 'success' : stockStatus === 'Low Stock' ? 'warning' : 'destructive'}
+                                                        className="bg-opacity-15 text-opacity-100"
+                                                    >
+                                                        {stockStatus}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="flex items-center gap-2">
+                                                        <button onClick={() => handleEdit(product)} className="text-slate-400 hover:text-primary-main transition-colors">
+                                                            <Edit size={16} />
+                                                        </button>
+                                                        <button onClick={() => handleDelete(product.id)} className="text-slate-400 hover:text-red-600 transition-colors">
+                                                            <Trash size={16} />
+                                                        </button>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
+                                    {filteredProducts.length === 0 && (
+                                        <TableRow>
+                                            <TableCell colSpan={7} className="text-center py-8 text-slate-500">
+                                                No products found.
                                             </TableCell>
                                         </TableRow>
-                                    );
-                                })}
-                                {filteredProducts.length === 0 && (
-                                    <TableRow>
-                                        <TableCell colSpan={7} className="text-center py-8 text-slate-500">
-                                            No products found.
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </div>
                     </div>
 
                     <ProductDrawer

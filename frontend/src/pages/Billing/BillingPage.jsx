@@ -44,6 +44,7 @@ const BillingPage = () => {
     });
     const [searchTerm, setSearchTerm] = useState('');
     const [focusIndex, setFocusIndex] = useState(-1); // For keyboard navigation in grid
+    const [mobileTab, setMobileTab] = useState('items'); // 'items' | 'payment'
 
     // Helper: Get Current Bill
     const currentBill = activeBills.find(b => b.id === activeBillId) || activeBills[0];
@@ -395,10 +396,26 @@ const BillingPage = () => {
             </div>
 
             {/* Main Workspace */}
-            <div className="flex flex-1 overflow-hidden p-2 gap-2">
+            <div className="flex flex-1 overflow-hidden p-2 gap-2 flex-col md:flex-row relative">
+
+                {/* Mobile Tab Toggles */}
+                <div className="md:hidden flex w-full bg-slate-200 rounded-lg p-1 mb-2 shrink-0">
+                    <button
+                        className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${mobileTab === 'items' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}
+                        onClick={() => setMobileTab('items')}
+                    >
+                        Items ({currentBill.cart.length})
+                    </button>
+                    <button
+                        className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${mobileTab === 'payment' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}
+                        onClick={() => setMobileTab('payment')}
+                    >
+                        Payment (₹{currentBill.totals.total.toFixed(0)})
+                    </button>
+                </div>
 
                 {/* Left Pane - Search & Grid */}
-                <div className="flex-1 flex flex-col gap-2 bg-transparent">
+                <div className={`flex-1 flex flex-col gap-2 bg-transparent ${mobileTab === 'items' ? 'flex' : 'hidden md:flex'}`}>
                     {/* Item Search Bar */}
                     <div className="relative z-20">
                         <div className="relative">
@@ -407,7 +424,7 @@ const BillingPage = () => {
                                 ref={searchInputRef}
                                 autoFocus
                                 className="pl-10 h-12 text-lg border-blue-300 focus:border-blue-600 shadow-sm"
-                                placeholder="Scan or search by item code, model no or item name"
+                                placeholder="Scan or search..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                             />
@@ -443,39 +460,44 @@ const BillingPage = () => {
                         selectedItemId={selectedItemId}
                         onRowClick={handleRowClick}
                     />
+
+                    {/* Mobile Floating Pay Button (only on Items tab) */}
+                    <div className="md:hidden mt-2">
+                        <Button
+                            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold h-12"
+                            onClick={() => setMobileTab('payment')}
+                        >
+                            Proceed to Pay ₹{currentBill.totals.total.toFixed(2)}
+                        </Button>
+                    </div>
                 </div>
 
                 {/* Right Pane - Sidebar */}
-                {/* Right Pane - Sidebar */}
-                <BillingSidebar
-                    customer={currentBill.customer}
-                    onCustomerSearch={(e) => {
-                        if (currentBill.customer) {
-                            // If already has customer, clear it (toggle) or ask confirmation? 
-                            // Simple behavior: clicking X clears, checking input opens modal.
-                            // But Sidebar input has onClick logic. 
-                            // Let's assume the Sidebar handles the clearing if X is clicked (passing null), and searching if input clicked.
-                            // Wait, Sidebar prop says onCustomerSearch.
-                            // If argument is explicitly null (clear), clear it. Else open modal.
-                            if (e === null) {
-                                updateCurrentBill({ customer: null });
+                <div className={`${mobileTab === 'payment' ? 'flex flex-1 overflow-auto' : 'hidden md:block'} w-full md:w-auto`}>
+                    <BillingSidebar
+                        customer={currentBill.customer}
+                        onCustomerSearch={(e) => {
+                            if (currentBill.customer) {
+                                if (e === null) {
+                                    updateCurrentBill({ customer: null });
+                                } else {
+                                    setModals(prev => ({ ...prev, customerSearch: true }));
+                                }
                             } else {
                                 setModals(prev => ({ ...prev, customerSearch: true }));
                             }
-                        } else {
-                            setModals(prev => ({ ...prev, customerSearch: true }));
-                        }
-                    }}
-                    totals={currentBill.totals}
-                    onPaymentChange={(field, value) => {
-                        updateCurrentBill({
-                            [field === 'mode' ? 'paymentMode' : 'amountReceived']: value
-                        });
-                    }}
-                    paymentMode={currentBill.paymentMode}
-                    amountReceived={currentBill.amountReceived}
-                    onSavePrint={handleSavePrint}
-                />
+                        }}
+                        totals={currentBill.totals}
+                        onPaymentChange={(field, value) => {
+                            updateCurrentBill({
+                                [field === 'mode' ? 'paymentMode' : 'amountReceived']: value
+                            });
+                        }}
+                        paymentMode={currentBill.paymentMode}
+                        amountReceived={currentBill.amountReceived}
+                        onSavePrint={handleSavePrint}
+                    />
+                </div>
             </div>
 
             {/* Bottom Function Bar */}
