@@ -20,6 +20,7 @@ import { cn } from '../lib/utils';
 import { useTransactions } from '../context/TransactionContext';
 import { useExpenses } from '../context/ExpenseContext';
 import services from '../services/api';
+import { generateDashboardReport } from '../utils/generateReport';
 
 const StatCard = ({ title, value, change, changeType, icon: Icon, color }) => (
     <Card>
@@ -101,6 +102,22 @@ const Dashboard = () => {
 
     const navigate = useNavigate();
 
+    const handleDownloadReport = () => {
+        try {
+            const reportData = {
+                stats: statsData,
+                recentTransactions: recentOrders,
+                expenseStats: expenseStats
+            };
+
+            const filename = generateDashboardReport(reportData);
+            console.log(`Report generated: ${filename}`);
+        } catch (error) {
+            console.error('Error generating report:', error);
+            alert('Failed to generate report. Please try again.');
+        }
+    };
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-0">
@@ -109,7 +126,7 @@ const Dashboard = () => {
                     <Button onClick={() => navigate('/billing')} className="flex-1 md:flex-none bg-primary-main hover:bg-primary-hover text-white">
                         <ShoppingCart className="mr-2 h-4 w-4" /> New Sale
                     </Button>
-                    <Button variant="outline" className="flex-1 md:flex-none">Download Report</Button>
+                    <Button variant="outline" className="flex-1 md:flex-none" onClick={handleDownloadReport}>Download Report</Button>
                 </div>
             </div>
 
