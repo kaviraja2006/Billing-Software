@@ -38,6 +38,9 @@ api.interceptors.response.use(
         // Handle network errors (server not running, connection refused, etc.)
         if (!error.response) {
             console.error('Network error: Backend server may not be running. Please ensure the backend is started on port 5001.');
+        } else {
+            // Log detailed API error for debugging
+            console.error('API Error:', error.response.status, error.response.data);
         }
 
         if (error.response && error.response.status === 401) {
