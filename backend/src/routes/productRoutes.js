@@ -1,4 +1,4 @@
-const express = require('express'); // Force update
+const express = require('express');
 const router = express.Router();
 const {
     getProducts,
