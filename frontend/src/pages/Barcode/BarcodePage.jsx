@@ -11,6 +11,7 @@ const BarcodeGeneratorPage = () => {
     const { products } = useProducts();
     const [inputValue, setInputValue] = useState('PROD-101');
     const [barcodeValue, setBarcodeValue] = useState('PROD-101');
+    const [barcodeFormat, setBarcodeFormat] = useState('CODE128');
 
     const generateBarcode = () => {
         setBarcodeValue(inputValue);
@@ -21,6 +22,7 @@ const BarcodeGeneratorPage = () => {
         if (prod) {
             setInputValue(prod.barcode || prod.id); // Use barcode if exists, else ID
             setBarcodeValue(prod.barcode || prod.id);
+            setBarcodeFormat(prod.barcodeType || 'CODE128');
         }
     };
 
@@ -75,6 +77,15 @@ const BarcodeGeneratorPage = () => {
                                 <option key={p.id} value={p.id}>{p.name} ({p.barcode || 'No Barcode'})</option>
                             ))}
                         </select>
+                        <select
+                            className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 mt-2"
+                            value={barcodeFormat}
+                            onChange={(e) => setBarcodeFormat(e.target.value)}
+                        >
+                            <option value="CODE128">CODE-128</option>
+                            <option value="EAN13">EAN-13</option>
+                            <option value="UPC">UPC-A</option>
+                        </select>
                     </div>
 
                     <div className="flex gap-2">
@@ -100,7 +111,7 @@ const BarcodeGeneratorPage = () => {
                                 minHeight: '150px'
                             }}
                         >
-                            <Barcode value={barcodeValue} width={2} height={100} fontSize={16} />
+                            <Barcode value={barcodeValue} format={barcodeFormat} width={2} height={100} fontSize={16} />
                         </div>
                     </div>
 

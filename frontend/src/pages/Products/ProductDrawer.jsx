@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Drawer } from '../../components/ui/Drawer';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
+import { Search, Loader2 } from 'lucide-react';
+import { fetchProductMetadata } from '../../services/barcodeService';
 
 const ProductDrawer = ({ isOpen, onClose, product, onSave }) => {
     // Determine title based on whether we are editing or creating
@@ -15,11 +17,15 @@ const ProductDrawer = ({ isOpen, onClose, product, onSave }) => {
         price: '',
         stock: '',
         barcode: '',
+        barcodeType: 'CODE128',
         taxRate: 0,
         costPrice: '',
         minStock: 10,
         unit: 'pc'
     });
+
+    const [isLookingUp, setIsLookingUp] = useState(false);
+    const priceInputRef = useRef(null);
 
     // Populate form on edit
     useEffect(() => {
@@ -31,6 +37,7 @@ const ProductDrawer = ({ isOpen, onClose, product, onSave }) => {
                 price: product.price || '',
                 stock: product.stock || '',
                 barcode: product.barcode || '',
+                barcodeType: product.barcodeType || 'CODE128',
                 taxRate: product.taxRate || 0,
                 costPrice: product.costPrice || '',
                 minStock: product.minStock || 10,
@@ -44,6 +51,7 @@ const ProductDrawer = ({ isOpen, onClose, product, onSave }) => {
                 price: '',
                 stock: '',
                 barcode: '',
+                barcodeType: 'CODE128',
                 taxRate: 0,
                 costPrice: '',
                 minStock: 10,
@@ -63,6 +71,36 @@ const ProductDrawer = ({ isOpen, onClose, product, onSave }) => {
             return;
         }
         onSave(formData);
+    };
+
+    const handleBarcodeLookup = async () => {
+        const code = formData.barcode;
+        if (!code) return;
+
+        setIsLookingUp(true);
+        try {
+            const metadata = await fetchProductMetadata(code);
+            if (metadata) {
+                setFormData(prev => ({
+                    ...prev,
+                    name: metadata.name || prev.name,
+                    brand: metadata.brand || prev.brand,
+                    category: metadata.category || prev.category,
+                    // Auto-detect type if possible or default to EAN13 for long codes
+                    barcodeType: code.length === 13 ? 'EAN13' : code.length === 12 ? 'UPC' : prev.barcodeType
+                }));
+                // Focus the price field for smoother workflow
+                setTimeout(() => priceInputRef.current?.focus(), 100);
+                // Optional: Show a subtle toast or indicator of success? 
+                // For now, the visual form update is feedback enough.
+            } else {
+                alert('Product details not found for this barcode.');
+            }
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setIsLookingUp(false);
+        }
     };
 
     return (
@@ -122,12 +160,42 @@ const ProductDrawer = ({ isOpen, onClose, product, onSave }) => {
                         </div>
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-slate-700">Barcode / SKU</label>
-                            <Input
-                                name="barcode"
-                                placeholder="Scan or enter barcode"
-                                value={formData.barcode}
+                            <div className="flex gap-2">
+                                <Input
+                                    name="barcode"
+                                    placeholder="Scan or enter"
+                                    value={formData.barcode}
+                                    onChange={handleChange}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            handleBarcodeLookup();
+                                        }
+                                    }}
+                                />
+                                <Button
+                                    variant="outline"
+                                    className="px-3"
+                                    onClick={handleBarcodeLookup}
+                                    disabled={!formData.barcode || isLookingUp}
+                                    title="Lookup Product Details"
+                                >
+                                    {isLookingUp ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                                </Button>
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-slate-700">Barcode Type</label>
+                            <select
+                                name="barcodeType"
+                                value={formData.barcodeType}
                                 onChange={handleChange}
-                            />
+                                className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                <option value="CODE128">CODE-128 (Standard)</option>
+                                <option value="EAN13">EAN-13 (Retail/Books)</option>
+                                <option value="UPC">UPC-A (US Retail)</option>
+                            </select>
                         </div>
                     </div>
 
@@ -140,6 +208,7 @@ const ProductDrawer = ({ isOpen, onClose, product, onSave }) => {
                                 placeholder="0.00"
                                 value={formData.price}
                                 onChange={handleChange}
+                                ref={priceInputRef}
                             />
                         </div>
                         <div className="space-y-2">

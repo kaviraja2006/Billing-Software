@@ -3,7 +3,12 @@ const mongoose = require('mongoose');
 const productSchema = mongoose.Schema(
     {
         name: { type: String, required: true },
-        barcode: { type: String }, // can be same as sku or separate. Contract uses sku in response but payload has sku. Implementation plan said sku/barcode.
+        barcode: { type: String },
+        barcodeType: {
+            type: String,
+            enum: ['CODE128', 'EAN13', 'UPC'],
+            default: 'CODE128'
+        },
         // Contract says: Response: { id, name, sku, category, price, stock, unit }
         // Payload: { name, sku, category, price, stock, unit }
         // Let's use 'sku' to match contract strictly, but we can alias or store barcode there.
