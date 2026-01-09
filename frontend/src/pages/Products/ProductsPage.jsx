@@ -53,7 +53,7 @@ const ProductsPage = () => {
             }
             setIsDrawerOpen(false);
         } catch (error) {
-            alert('Failed to save product');
+            alert(error.response?.data?.message || 'Failed to save product');
         }
     };
 

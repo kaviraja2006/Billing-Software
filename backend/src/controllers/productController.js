@@ -61,6 +61,7 @@ const createProduct = asyncHandler(async (req, res) => {
         unit: Joi.string().allow('').optional(),
         brand: Joi.string().allow('').optional(),
         barcode: Joi.string().allow('').optional(),
+        barcodeType: Joi.string().valid('CODE128', 'EAN13', 'UPC').default('CODE128').optional(),
         description: Joi.string().allow('').optional(),
         taxRate: Joi.number().optional(),
         costPrice: Joi.number().optional(),
@@ -73,7 +74,7 @@ const createProduct = asyncHandler(async (req, res) => {
         throw new Error(error.details[0].message);
     }
 
-    const { name, sku, category, price, stock, unit, brand, description, taxRate, costPrice, minStock } = req.body;
+    const { name, sku, category, price, stock, unit, brand, barcode, barcodeType, description, taxRate, costPrice, minStock } = req.body;
 
     // Check if sku exists for this user (SKU should be unique per user, not globally)
     const productExists = await Product.findOne({ sku, userId: req.user._id });
@@ -91,6 +92,8 @@ const createProduct = asyncHandler(async (req, res) => {
         stock,
         unit,
         brand,
+        barcode,
+        barcodeType,
         description,
         taxRate,
         costPrice,
@@ -107,6 +110,8 @@ const createProduct = asyncHandler(async (req, res) => {
         price: product.price,
         stock: product.stock,
         unit: product.unit,
+        barcode: product.barcode,
+        barcodeType: product.barcodeType,
         description: product.description,
         taxRate: product.taxRate,
         costPrice: product.costPrice,
@@ -129,6 +134,8 @@ const updateProduct = asyncHandler(async (req, res) => {
         product.stock = req.body.stock !== undefined ? req.body.stock : product.stock;
         product.unit = req.body.unit || product.unit;
         product.brand = req.body.brand !== undefined ? req.body.brand : product.brand;
+        product.barcode = req.body.barcode !== undefined ? req.body.barcode : product.barcode;
+        product.barcodeType = req.body.barcodeType || product.barcodeType;
         product.description = req.body.description !== undefined ? req.body.description : product.description;
         product.taxRate = req.body.taxRate !== undefined ? req.body.taxRate : product.taxRate;
         product.costPrice = req.body.costPrice !== undefined ? req.body.costPrice : product.costPrice;
@@ -144,6 +151,8 @@ const updateProduct = asyncHandler(async (req, res) => {
             price: updatedProduct.price,
             stock: updatedProduct.stock,
             unit: updatedProduct.unit,
+            barcode: updatedProduct.barcode,
+            barcodeType: updatedProduct.barcodeType,
             description: updatedProduct.description
         });
     } else {
