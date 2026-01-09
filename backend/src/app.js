@@ -16,7 +16,7 @@ const settingsRoutes = require('./routes/settingsRoutes');
 const app = express();
 
 // Middleware
-app.use(helmet());
+// Middleware
 app.use(cors({
     origin: ['http://localhost:5173', 'http://localhost:3000', 'https://billing-software-trqu.vercel.app', 'https://billing-software-bay-seven.vercel.app'],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -24,6 +24,8 @@ app.use(cors({
     credentials: true,
     optionsSuccessStatus: 200
 }));
+app.options('*', cors()); // Enable pre-flight for all routes
+app.use(helmet());
 app.use(express.json());
 if (process.env.NODE_ENV === 'development') {
     app.use(morgan('dev'));
