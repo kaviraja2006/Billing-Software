@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
-import { Calendar, Download, TrendingUp, TrendingDown, FileText, CreditCard, DollarSign, Wallet } from 'lucide-react';
+import { Calendar, Download, TrendingUp, TrendingDown, FileText, CreditCard, IndianRupee, Wallet } from 'lucide-react';
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell, Legend
@@ -95,10 +95,10 @@ const ReportsPage = () => {
                         <Card className="bg-primary-main/5 border-primary-main/10 shadow-sm">
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                 <CardTitle className="text-sm font-medium text-primary-main">Total Sales</CardTitle>
-                                <DollarSign className="h-4 w-4 text-primary-main" />
+                                <IndianRupee className="h-4 w-4 text-primary-main" />
                             </CardHeader>
                             <CardContent>
-                                <div className="text-2xl font-bold text-primary-main">${stats.totalSales.toFixed(2)}</div>
+                                <div className="text-2xl font-bold text-primary-main">₹{stats.totalSales.toFixed(2)}</div>
                             </CardContent>
                         </Card>
 
@@ -109,7 +109,7 @@ const ReportsPage = () => {
                                 <TrendingDown className="h-4 w-4 text-red-600" />
                             </CardHeader>
                             <CardContent>
-                                <div className="text-2xl font-bold text-red-700">${stats.totalExpenses.toFixed(2)}</div>
+                                <div className="text-2xl font-bold text-red-700">₹{stats.totalExpenses.toFixed(2)}</div>
                             </CardContent>
                         </Card>
 
@@ -121,7 +121,7 @@ const ReportsPage = () => {
                             </CardHeader>
                             <CardContent>
                                 <div className={`text-2xl font-bold ${stats.netProfit >= 0 ? 'text-green-700' : 'text-orange-700'}`}>
-                                    ${stats.netProfit.toFixed(2)}
+                                    ₹{stats.netProfit.toFixed(2)}
                                 </div>
                             </CardContent>
                         </Card>
@@ -133,7 +133,7 @@ const ReportsPage = () => {
                                 <CreditCard className="h-4 w-4 text-slate-400" />
                             </CardHeader>
                             <CardContent>
-                                <div className="text-2xl font-bold text-slate-900">${stats.avgOrderValue.toFixed(2)}</div>
+                                <div className="text-2xl font-bold text-slate-900">₹{stats.avgOrderValue.toFixed(2)}</div>
                             </CardContent>
                         </Card>
 
@@ -209,13 +209,13 @@ const ReportsPage = () => {
                             <CardContent>
                                 <div className="space-y-4">
                                     {stats.topProducts.map((p, idx) => (
-                                        <div key={idx} className="flex items-center justify-between border-b pb-2 last:border-0 last:pb-0">
-                                            <div>
-                                                <p className="font-medium text-slate-900">{p.name}</p>
+                                        <div key={idx} className="flex items-center justify-between border-b pb-2 last:border-0 last:pb-0 gap-4">
+                                            <div className="min-w-0">
+                                                <p className="font-medium text-slate-900 truncate" title={p.name}>{p.name}</p>
                                                 <p className="text-sm text-slate-500">{p.quantity} units sold</p>
                                             </div>
-                                            <div className="font-semibold text-slate-900">
-                                                ${p.revenue.toFixed(2)}
+                                            <div className="font-semibold text-slate-900 whitespace-nowrap">
+                                                ₹{p.revenue.toFixed(2)}
                                             </div>
                                         </div>
                                     ))}

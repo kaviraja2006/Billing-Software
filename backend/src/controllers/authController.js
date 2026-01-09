@@ -42,12 +42,13 @@ const loginUser = asyncHandler(async (req, res) => {
 // @route   POST /auth/register
 // @access  Public
 const registerUser = asyncHandler(async (req, res) => {
-    const { name, email, password } = req.body;
+    const { name, email, password, role } = req.body;
 
     const schema = Joi.object({
         name: Joi.string().required(),
         email: Joi.string().email().required(),
         password: Joi.string().min(6).required(),
+        role: Joi.string().valid('admin', 'employee').default('employee'),
     });
 
     const { error } = schema.validate(req.body);
@@ -67,6 +68,7 @@ const registerUser = asyncHandler(async (req, res) => {
         name,
         email,
         password,
+        role: role || 'employee',
     });
 
     if (user) {

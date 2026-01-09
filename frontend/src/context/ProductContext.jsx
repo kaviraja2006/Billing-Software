@@ -92,6 +92,7 @@ export const ProductProvider = ({ children }) => {
                 stock: parseInt(getVal(['stock', 'qty', 'quantity', 'count', 'inventory', 'balance', 'units'])) || 0,
                 barcode: barcode,
                 sku: barcode,
+                unit: getVal(['unit', 'uom', 'measure', 'units']) || 'pc',
                 description: getVal(['description', 'desc', 'details', 'specification']) || ''
             };
 

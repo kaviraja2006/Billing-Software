@@ -144,11 +144,11 @@ const CustomerDrawer = ({ isOpen, onClose, customer, onSave }) => {
                                         </div>
                                         <div className="bg-slate-50 p-4 rounded-lg text-center">
                                             <p className="text-xs text-slate-500 uppercase">Total Spent</p>
-                                            <p className="text-xl font-bold text-green-600">${customer.totalSpent}</p>
+                                            <p className="text-xl font-bold text-green-600">₹{customer.totalSpent}</p>
                                         </div>
                                         <div className="bg-slate-50 p-4 rounded-lg text-center">
                                             <p className="text-xs text-slate-500 uppercase">Due Amount</p>
-                                            <p className="text-xl font-bold text-red-600">${customer.due}</p>
+                                            <p className="text-xl font-bold text-red-600">₹{customer.due}</p>
                                         </div>
                                     </div>
                                 </div>

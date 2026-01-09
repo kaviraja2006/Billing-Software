@@ -9,7 +9,8 @@ import { mockReportService } from './mock/reports'; // Will create later
 import { mockSettingsService } from './mock/settings'; // Will create later
 
 const USE_MOCK = false; // Set to true to use mock services, false to use real API
-const API_BASE_URL = 'http://localhost:5001'; // Placeholder for real backend
+//const API_BASE_URL = 'http://localhost:5001'; // Switched to local for development
+const API_BASE_URL = 'https://billing-software-bay-seven.vercel.app'; // Placeholder for real backend
 
 const api = axios.create({
     baseURL: API_BASE_URL,
@@ -37,6 +38,9 @@ api.interceptors.response.use(
         // Handle network errors (server not running, connection refused, etc.)
         if (!error.response) {
             console.error('Network error: Backend server may not be running. Please ensure the backend is started on port 5001.');
+        } else {
+            // Log detailed API error for debugging
+            console.error('API Error:', error.response.status, error.response.data);
         }
 
         if (error.response && error.response.status === 401) {

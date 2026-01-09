@@ -6,7 +6,8 @@ const Joi = require('joi');
 // @route   GET /expenses
 // @access  Private
 const getExpenses = asyncHandler(async (req, res) => {
-    const expenses = await Expense.find({}).sort({ date: -1 });
+    // Filter expenses by authenticated user's ID
+    const expenses = await Expense.find({ userId: req.user._id }).sort({ date: -1 });
     const response = expenses.map(e => ({
         id: e._id,
         title: e.title,
@@ -38,12 +39,14 @@ const createExpense = asyncHandler(async (req, res) => {
 
     const { title, amount, category, date, description } = req.body;
 
+    // Attach authenticated user's ID to the expense
     const expense = await Expense.create({
         title,
         amount,
         category,
         date,
         description,
+        userId: req.user._id
     });
 
     res.status(201).json({
@@ -60,14 +63,15 @@ const createExpense = asyncHandler(async (req, res) => {
 // @route   DELETE /expenses/:id
 // @access  Private
 const deleteExpense = asyncHandler(async (req, res) => {
-    const expense = await Expense.findById(req.params.id);
+    // Verify ownership: find expense by ID AND userId
+    const expense = await Expense.findOne({ _id: req.params.id, userId: req.user._id });
 
     if (expense) {
         await expense.deleteOne();
         res.json({ message: 'Expense deleted successfully' });
     } else {
         res.status(404);
-        throw new Error('Expense not found');
+        throw new Error('Expense not found or unauthorized');
     }
 });
 

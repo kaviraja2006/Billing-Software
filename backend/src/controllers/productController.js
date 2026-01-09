@@ -6,11 +6,8 @@ const Joi = require('joi');
 // @route   GET /products
 // @access  Private
 const getProducts = asyncHandler(async (req, res) => {
-    const products = await Product.find({}).sort({ createdAt: -1 });
-    // Contract expects: [{ id, name, sku, category, price, stock, unit }, ...]
-    // Mongoose returns _id. We can use a transformation or just rely on frontend handling _id.
-    // The contract example says 'id'. Usually in JSON responses _id is fine or we map it.
-    // Let's map it to be safe and clean.
+    // Filter products by authenticated user's ID
+    const products = await Product.find({ userId: req.user._id }).sort({ createdAt: -1 });
     const response = products.map(p => ({
         id: p._id,
         name: p.name,
@@ -29,7 +26,8 @@ const getProducts = asyncHandler(async (req, res) => {
 // @route   GET /products/:id
 // @access  Private
 const getProductById = asyncHandler(async (req, res) => {
-    const product = await Product.findById(req.params.id);
+    // Verify ownership
+    const product = await Product.findOne({ _id: req.params.id, userId: req.user._id });
 
     if (product) {
         res.json({
@@ -45,7 +43,7 @@ const getProductById = asyncHandler(async (req, res) => {
         });
     } else {
         res.status(404);
-        throw new Error('Product not found');
+        throw new Error('Product not found or unauthorized');
     }
 });
 
@@ -77,13 +75,14 @@ const createProduct = asyncHandler(async (req, res) => {
 
     const { name, sku, category, price, stock, unit, brand, description, taxRate, costPrice, minStock } = req.body;
 
-    // Check if sku exists
-    const productExists = await Product.findOne({ sku });
+    // Check if sku exists for this user (SKU should be unique per user, not globally)
+    const productExists = await Product.findOne({ sku, userId: req.user._id });
     if (productExists) {
         res.status(400);
         throw new Error('Product with this SKU already exists');
     }
 
+    // Attach user ID
     const product = await Product.create({
         name,
         sku,
@@ -95,7 +94,8 @@ const createProduct = asyncHandler(async (req, res) => {
         description,
         taxRate,
         costPrice,
-        minStock
+        minStock,
+        userId: req.user._id
     });
 
     res.status(201).json({
@@ -118,7 +118,8 @@ const createProduct = asyncHandler(async (req, res) => {
 // @route   PUT /products/:id
 // @access  Private
 const updateProduct = asyncHandler(async (req, res) => {
-    const product = await Product.findById(req.params.id);
+    // Verify ownership
+    const product = await Product.findOne({ _id: req.params.id, userId: req.user._id });
 
     if (product) {
         product.name = req.body.name || product.name;
@@ -147,7 +148,7 @@ const updateProduct = asyncHandler(async (req, res) => {
         });
     } else {
         res.status(404);
-        throw new Error('Product not found');
+        throw new Error('Product not found or unauthorized');
     }
 });
 
@@ -155,14 +156,15 @@ const updateProduct = asyncHandler(async (req, res) => {
 // @route   DELETE /products/:id
 // @access  Private
 const deleteProduct = asyncHandler(async (req, res) => {
-    const product = await Product.findById(req.params.id);
+    // Verify ownership
+    const product = await Product.findOne({ _id: req.params.id, userId: req.user._id });
 
     if (product) {
         await product.deleteOne();
         res.json({ message: 'Product deleted successfully' });
     } else {
         res.status(404);
-        throw new Error('Product not found');
+        throw new Error('Product not found or unauthorized');
     }
 });
 

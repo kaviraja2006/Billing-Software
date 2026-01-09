@@ -3,17 +3,14 @@ const http = require('http');
 const app = require('./src/app');
 const connectDB = require('./src/config/db');
 
-const fs = require('fs');
-const path = require('path');
-
 const PORT = process.env.PORT || 5001;
 
 const startServer = () => {
     // Connect to Database (Non-blocking)
     connectDB().then(() => {
-        fs.writeFileSync(path.join(__dirname, 'db_status.txt'), `Connected at ${new Date().toISOString()}`);
+        console.log('Database connected successfully');
     }).catch(err => {
-        fs.writeFileSync(path.join(__dirname, 'db_status.txt'), `Failed at ${new Date().toISOString()}: ${err.message}`);
+        console.error('Database connection failed:', err.message);
     });
 
     const server = http.createServer(app);

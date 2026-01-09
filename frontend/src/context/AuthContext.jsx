@@ -63,7 +63,7 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    const register = async (name, email, password) => {
+    const register = async (name, email, password, role = 'employee') => {
         try {
             // Validate inputs before sending
             if (!name || !name.trim()) {
@@ -76,7 +76,12 @@ export const AuthProvider = ({ children }) => {
                 throw new Error('Password must be at least 6 characters');
             }
 
-            const response = await services.auth.register({ name: name.trim(), email: email.trim(), password });
+            const response = await services.auth.register({
+                name: name.trim(),
+                email: email.trim(),
+                password,
+                role
+            });
             const { user, token } = response.data;
             setUser(user);
             // Store token and user in localStorage

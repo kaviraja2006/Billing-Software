@@ -16,7 +16,7 @@ import {
     Menu
 } from 'lucide-react';
 
-const Sidebar = ({ isOpen = true, toggleSidebar }) => {
+const Sidebar = ({ isOpen = true, toggleSidebar, isMobile, onCloseMobile }) => {
     const { user, logout } = useAuth();
 
     const handleLogout = async () => {
@@ -50,15 +50,26 @@ const Sidebar = ({ isOpen = true, toggleSidebar }) => {
                         <span className="text-xl font-bold text-body-primary tracking-tight">POS System</span>
                     )}
                 </div>
-                {toggleSidebar && (
-                    <button
-                        onClick={toggleSidebar}
-                        className="p-1.5 rounded-md hover:bg-slate-100 text-slate-600 hover:text-body-primary transition-colors"
-                        aria-label="Toggle sidebar"
-                    >
-                        <Menu size={18} />
-                    </button>
-                )}
+                {/* Desktop Toggle */}
+                <div className="flex items-center gap-2">
+                    {onCloseMobile && (
+                        <button
+                            onClick={onCloseMobile}
+                            className="md:hidden p-1.5 rounded-md hover:bg-slate-100 text-slate-600 hover:text-body-primary transition-colors"
+                        >
+                            <LogOut size={18} className="rotate-180" /> {/* temporary icon or X */}
+                        </button>
+                    )}
+                    {toggleSidebar && (
+                        <button
+                            onClick={toggleSidebar}
+                            className="hidden md:block p-1.5 rounded-md hover:bg-slate-100 text-slate-600 hover:text-body-primary transition-colors"
+                            aria-label="Toggle sidebar"
+                        >
+                            <Menu size={18} />
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Navigation */}
@@ -77,6 +88,7 @@ const Sidebar = ({ isOpen = true, toggleSidebar }) => {
                             )
                         }
                         title={!isOpen ? item.label : undefined}
+                        onClick={() => onCloseMobile && onCloseMobile()}
                     >
                         {({ isActive }) => (
                             <>

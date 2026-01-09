@@ -35,6 +35,11 @@ const invoiceSchema = mongoose.Schema(
         total: { type: Number, required: true },
         status: { type: String, required: true, default: 'Paid' },
         paymentMethod: { type: String, default: 'Cash' },
+        userId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            required: true
+        },
     },
     {
         timestamps: true,

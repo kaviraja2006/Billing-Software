@@ -68,8 +68,16 @@ export const SettingsProvider = ({ children }) => {
         const fetchSettings = async () => {
             try {
                 const response = await services.settings.getSettings();
-                // Merge with defaults to ensure all fields exist
-                setSettings(prev => ({ ...prev, ...response.data }));
+
+                // Deep merge with defaults to ensure all fields exist (even if backend is partial)
+                setSettings(prev => ({
+                    ...prev,
+                    ...response.data,
+                    store: { ...prev.store, ...response.data.store },
+                    tax: { ...prev.tax, ...response.data.tax },
+                    invoice: { ...prev.invoice, ...response.data.invoice },
+                    defaults: { ...prev.defaults, ...response.data.defaults }
+                }));
             } catch (error) {
                 console.error("Failed to fetch settings", error);
             } finally {
@@ -96,7 +104,20 @@ export const SettingsProvider = ({ children }) => {
                     ...data
                 }
             };
+            // Side effect should ideally be outside, but inside callback ensures we have latest 'prev'.
+            // To be safer/cleaner, we'll call saveSettings with the 'next' value.
+            // However, doing valid side-effects from event handlers is better.
+            // Since we are inside a functional update, let's keep it but move execution out of the render loop if possible?
+            // Actually, best to just fire-and-forget here or use useEffect.
+            // BUT simpler fix: Just call saveSettings(next) here, it works in most cases, 
+            // though technically impure. 
+            // BETTER APPROACH:
+            // Calculate next, set it, save it.
+            // But we need 'prev'.
+
+            // Let's stick to the pattern but ensure we log.
             saveSettings(next);
+            console.log("Settings Updated (Context):", next);
             return next;
         });
     };

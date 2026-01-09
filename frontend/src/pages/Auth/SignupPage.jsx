@@ -4,10 +4,10 @@ import { useAuth } from '../../context/AuthContext';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
-import { User, Mail, Lock, AlertCircle, UserPlus } from 'lucide-react';
+import { User, Mail, Lock, AlertCircle, UserPlus, Crown, Users } from 'lucide-react';
 
 const SignupPage = () => {
-    const [formData, setFormData] = useState({ name: '', email: '', password: '' });
+    const [formData, setFormData] = useState({ name: '', email: '', password: '', role: 'employee' });
     const [error, setError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const navigate = useNavigate();
@@ -37,7 +37,7 @@ const SignupPage = () => {
 
         setIsSubmitting(true);
         try {
-            await register(formData.name.trim(), formData.email.trim(), formData.password);
+            await register(formData.name.trim(), formData.email.trim(), formData.password, formData.role);
             // register already stores token and user in localStorage via context
             navigate('/');
         } catch (err) {
@@ -49,7 +49,7 @@ const SignupPage = () => {
 
     return (
         <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-            <Card className="w-full max-w-md p-8 space-y-8 bg-white shadow-xl">
+            <Card className="w-full max-w-md p-6 md:p-8 space-y-8 bg-white shadow-xl">
                 <div className="text-center space-y-2">
                     <div className="mx-auto bg-primary-main text-white p-3 rounded-full w-fit">
                         <UserPlus size={24} />
@@ -115,6 +115,37 @@ const SignupPage = () => {
                                     onChange={handleChange}
                                     required
                                 />
+                            </div>
+                        </div>
+
+                        {/* Role Selection */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-slate-700">Account Type</label>
+                            <div className="grid grid-cols-2 gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData({ ...formData, role: 'admin' })}
+                                    className={`flex flex-col items-center gap-2 p-4 border-2 rounded-lg transition-all ${formData.role === 'admin'
+                                        ? 'border-red-500 bg-red-50 text-red-700'
+                                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                                        }`}
+                                >
+                                    <Crown className="h-6 w-6" />
+                                    <span className="font-semibold text-sm">Admin</span>
+                                    <span className="text-xs text-center opacity-75">Full access</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData({ ...formData, role: 'employee' })}
+                                    className={`flex flex-col items-center gap-2 p-4 border-2 rounded-lg transition-all ${formData.role === 'employee'
+                                        ? 'border-red-500 bg-red-50 text-red-700'
+                                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                                        }`}
+                                >
+                                    <Users className="h-6 w-6" />
+                                    <span className="font-semibold text-sm">Employee</span>
+                                    <span className="text-xs text-center opacity-75">Limited access</span>
+                                </button>
                             </div>
                         </div>
                     </div>

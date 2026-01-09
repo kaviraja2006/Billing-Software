@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/Table';
-import { Search, Plus, Filter, FileText, Calendar, DollarSign } from 'lucide-react';
+import { Search, Plus, Filter, FileText, Calendar, IndianRupee } from 'lucide-react';
 import ExpenseModal from './ExpenseModal';
+import DateRangePicker from '../../components/DateRangePicker/DateRangePicker';
+import CategoryFilter from '../../components/CategoryFilter/CategoryFilter';
 
 import { useExpenses } from '../../context/ExpenseContext';
 
@@ -11,12 +13,35 @@ const ExpensesPage = () => {
     const { expenses, deleteExpense, stats } = useExpenses();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [dateRange, setDateRange] = useState(null);
+    const [selectedCategory, setSelectedCategory] = useState(null);
 
     // Filter Logic
-    const filteredExpenses = expenses.filter(e =>
-        e.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        e.category.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredExpenses = expenses.filter(e => {
+        // Search filter
+        const matchesSearch = e.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            e.category.toLowerCase().includes(searchTerm.toLowerCase());
+
+        // Date range filter
+        let matchesDateRange = true;
+        if (dateRange) {
+            const expenseDate = new Date(e.date);
+            expenseDate.setHours(0, 0, 0, 0);
+
+            const startDate = new Date(dateRange.startDate);
+            startDate.setHours(0, 0, 0, 0);
+
+            const endDate = new Date(dateRange.endDate);
+            endDate.setHours(23, 59, 59, 999);
+
+            matchesDateRange = expenseDate >= startDate && expenseDate <= endDate;
+        }
+
+        // Category filter
+        const matchesCategory = !selectedCategory || e.category === selectedCategory;
+
+        return matchesSearch && matchesDateRange && matchesCategory;
+    });
 
     return (
         <div className="space-y-6">
@@ -39,8 +64,15 @@ const ExpensesPage = () => {
                     />
                 </div>
                 <div className="flex gap-2">
-                    <Button variant="outline"><Calendar className="mr-2 h-4 w-4" /> Date Range</Button>
-                    <Button variant="outline"><Filter className="mr-2 h-4 w-4" /> Category</Button>
+                    <DateRangePicker
+                        value={dateRange}
+                        onDateRangeChange={setDateRange}
+                    />
+                    <CategoryFilter
+                        expenses={expenses}
+                        value={selectedCategory}
+                        onCategoryChange={setSelectedCategory}
+                    />
                 </div>
             </div>
 

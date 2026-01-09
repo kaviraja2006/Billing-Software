@@ -5,11 +5,12 @@ const Settings = require('../models/settingsModel');
 // @route   GET /settings
 // @access  Private
 const getSettings = asyncHandler(async (req, res) => {
-    let settings = await Settings.findOne();
+    // Get settings for authenticated user only
+    let settings = await Settings.findOne({ userId: req.user._id });
 
     if (!settings) {
-        // Create default settings if not exists
-        settings = await Settings.create({});
+        // Create default settings for this user
+        settings = await Settings.create({ userId: req.user._id });
     }
 
     res.json(settings);
@@ -19,23 +20,17 @@ const getSettings = asyncHandler(async (req, res) => {
 // @route   PUT /settings
 // @access  Private
 const updateSettings = asyncHandler(async (req, res) => {
-    let settings = await Settings.findOne();
+    // Update settings for authenticated user only
+    let settings = await Settings.findOne({ userId: req.user._id });
 
     if (!settings) {
-        settings = await Settings.create(req.body);
+        settings = await Settings.create({ ...req.body, userId: req.user._id });
     } else {
-        // Deep update or robust replacement
-        // Using replace or individually setting fields is tedious for nested objects.
-        // Mongoose findOneAndUpdate with $set is easier but we want to return the updated doc.
-        // req.body can contain nested partial updates.
-
-        // Simple approach: merge top level or use explicit updates.
-        // Since payload structure matches schema, we can iterate or just use Object.assign for top level,
-        // but for nested 'tax', 'store', etc., we need to be careful not to overwrite with partials if not intended.
-        // However, usually the frontend sends the whole section or we assume deep merge.
-        // Let's rely on Mongoose's findOneAndUpdate which does $set.
-
-        settings = await Settings.findOneAndUpdate({}, { $set: req.body }, { new: true, upsert: true });
+        settings = await Settings.findOneAndUpdate(
+            { userId: req.user._id },
+            { $set: req.body },
+            { new: true, upsert: false }
+        );
     }
 
     res.json(settings);

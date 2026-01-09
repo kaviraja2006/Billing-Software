@@ -1,7 +1,8 @@
 import { Card } from '../../../components/ui/Card';
 import { Input } from '../../../components/ui/Input';
 import { Button } from '../../../components/ui/Button';
-import { Search, User, ChevronRight, Calculator } from 'lucide-react';
+import { Search, User, ChevronRight, Calculator, Printer } from 'lucide-react';
+import { useState } from 'react';
 import { cn } from '../../../lib/utils';
 
 const BillingSidebar = ({
@@ -14,6 +15,7 @@ const BillingSidebar = ({
     onSavePrint
 }) => {
     const currentDate = new Date().toLocaleDateString('en-IN'); // DD/MM/YYYY format
+    const [printFormat, setPrintFormat] = useState('80mm');
 
     return (
         <div className="w-full lg:w-96 flex flex-col gap-4 h-full">
@@ -98,12 +100,32 @@ const BillingSidebar = ({
 
             {/* Action Buttons */}
             <div className="flex flex-col gap-2">
-                <Button
-                    className="w-full h-12 bg-green-200 text-green-800 hover:bg-green-300 border border-green-300 font-bold text-lg shadow-sm"
-                    onClick={onSavePrint}
-                >
-                    Save & Print Bill [Ctrl+P]
-                </Button>
+                <div className="flex gap-2">
+                    <div className="relative w-1/3">
+                        <select
+                            value={printFormat}
+                            onChange={(e) => setPrintFormat(e.target.value)}
+                            className="w-full h-12 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
+                        >
+                            <optgroup label="Thermal">
+                                <option value="80mm">80mm</option>
+                                <option value="58mm">58mm</option>
+                                <option value="112mm">112mm</option>
+                            </optgroup>
+                            <optgroup label="Sheet">
+                                <option value="A4">A4 Invoice</option>
+                                <option value="A5">A5 Invoice</option>
+                            </optgroup>
+                        </select>
+                        <Printer size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                    </div>
+                    <Button
+                        className="w-2/3 h-12 bg-green-200 text-green-800 hover:bg-green-300 border border-green-300 font-bold text-lg shadow-sm"
+                        onClick={() => onSavePrint(printFormat)}
+                    >
+                        Save & Print
+                    </Button>
+                </div>
                 <Button
                     variant="outline"
                     className="w-full h-10 text-slate-600 font-medium"
