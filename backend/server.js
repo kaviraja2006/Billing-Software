@@ -1,19 +1,25 @@
+console.log("Server file loaded"); // Debug: Confirm file loading
 require('dotenv').config();
-const http = require('http');
 const app = require('./src/app');
 const connectDB = require('./src/config/db');
 
-// Connect to Database
-connectDB();
-
 const PORT = process.env.PORT || 5001;
 
-// Only start the server if this file is run directly (Local Dev)
-if (require.main === module) {
-    app.listen(PORT, () => {
-        console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
-    });
-}
+// Robust Server Start Function
+const startServer = async () => {
+    try {
+        // 1. Connect to Database first
+        await connectDB();
 
-// Export app for Vercel Serverless
-module.exports = app;
+        // 2. Start Listening on Port
+        app.listen(PORT, () => {
+            console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+        });
+
+    } catch (error) {
+        console.error("Error starting server:", error);
+        process.exit(1);
+    }
+};
+
+startServer();
