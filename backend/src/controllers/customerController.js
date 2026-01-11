@@ -10,10 +10,19 @@ const getCustomers = asyncHandler(async (req, res) => {
     const customers = await Customer.find({ userId: req.user._id }).sort({ createdAt: -1 });
     const response = customers.map(c => ({
         id: c._id,
-        name: c.name,
+        customerId: c.customerId,
+        fullName: c.fullName,
+        firstName: c.firstName,
+        lastName: c.lastName,
+        customerType: c.customerType,
+        gstin: c.gstin,
         email: c.email,
         phone: c.phone,
         address: c.address,
+        source: c.source,
+        tags: c.tags,
+        loyaltyPoints: c.loyaltyPoints,
+        notes: c.notes,
         totalVisits: c.totalVisits,
         totalSpent: c.totalSpent,
         due: c.due,
@@ -33,10 +42,19 @@ const getCustomerById = asyncHandler(async (req, res) => {
     if (customer) {
         const response = {
             id: customer._id,
-            name: customer.name,
+            customerId: customer.customerId,
+            fullName: customer.fullName,
+            firstName: customer.firstName,
+            lastName: customer.lastName,
+            customerType: customer.customerType,
+            gstin: customer.gstin,
             email: customer.email,
             phone: customer.phone,
             address: customer.address,
+            source: customer.source,
+            tags: customer.tags,
+            loyaltyPoints: customer.loyaltyPoints,
+            notes: customer.notes,
             totalVisits: customer.totalVisits,
             totalSpent: customer.totalSpent,
             due: customer.due,
@@ -54,13 +72,36 @@ const getCustomerById = asyncHandler(async (req, res) => {
 // @route   POST /customers
 // @access  Private
 const createCustomer = asyncHandler(async (req, res) => {
-    const { name, phone, email, address } = req.body;
+    const {
+        fullName,
+        phone,
+        email,
+        address,
+        customerType,
+        gstin,
+        source,
+        tags,
+        loyaltyPoints,
+        notes
+    } = req.body;
 
     const schema = Joi.object({
-        name: Joi.string().required(),
+        fullName: Joi.string().required(),
         phone: Joi.string().required(),
         email: Joi.string().allow('').optional(),
-        address: Joi.string().allow('').optional(),
+        address: Joi.object({
+            street: Joi.string().allow('').optional(),
+            area: Joi.string().allow('').optional(),
+            city: Joi.string().allow('').optional(),
+            pincode: Joi.string().allow('').optional(),
+            state: Joi.string().allow('').optional()
+        }).optional(),
+        customerType: Joi.string().valid('Individual', 'Business').optional(),
+        gstin: Joi.string().allow('').optional(),
+        source: Joi.string().valid('Walk-in', 'WhatsApp', 'Instagram', 'Referral', 'Other').optional(),
+        tags: Joi.array().items(Joi.string().valid('VIP', 'Wholesale', 'Credit')).optional(),
+        loyaltyPoints: Joi.number().optional(),
+        notes: Joi.string().allow('').optional()
     });
 
     const { error } = schema.validate(req.body);
@@ -69,20 +110,42 @@ const createCustomer = asyncHandler(async (req, res) => {
         throw new Error(error.details[0].message);
     }
 
+    // Split fullName into firstName and lastName
+    const nameParts = (fullName || '').trim().split(/\s+/);
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+
     // Attach user ID
     const customer = await Customer.create({
-        name,
+        firstName,
+        lastName,
         phone,
-        email,
-        address,
+        email: email || '',
+        address: address || {},
+        customerType: customerType || 'Individual',
+        gstin: gstin || '',
+        source: source || 'Walk-in',
+        tags: tags || [],
+        loyaltyPoints: loyaltyPoints || 0,
+        notes: notes || '',
         userId: req.user._id
     });
+
     const response = {
         id: customer._id,
-        name: customer.name,
+        customerId: customer.customerId,
+        fullName: customer.fullName,
+        firstName: customer.firstName,
+        lastName: customer.lastName,
+        customerType: customer.customerType,
+        gstin: customer.gstin,
         email: customer.email,
         phone: customer.phone,
         address: customer.address,
+        source: customer.source,
+        tags: customer.tags,
+        loyaltyPoints: customer.loyaltyPoints,
+        notes: customer.notes,
         totalVisits: customer.totalVisits,
         totalSpent: customer.totalSpent,
         due: customer.due,
@@ -100,18 +163,53 @@ const updateCustomer = asyncHandler(async (req, res) => {
     const customer = await Customer.findOne({ _id: req.params.id, userId: req.user._id });
 
     if (customer) {
-        customer.name = req.body.name || customer.name;
+        // Handle name update if fullName is provided
+        if (req.body.fullName) {
+            const nameParts = req.body.fullName.trim().split(/\s+/);
+            customer.firstName = nameParts[0] || customer.firstName;
+            customer.lastName = nameParts.slice(1).join(' ') || '';
+        }
+
         customer.phone = req.body.phone || customer.phone;
-        customer.email = req.body.email || customer.email;
-        customer.address = req.body.address || customer.address;
+        customer.email = req.body.email !== undefined ? req.body.email : customer.email;
+        customer.customerType = req.body.customerType || customer.customerType;
+        customer.gstin = req.body.gstin !== undefined ? req.body.gstin : customer.gstin;
+        customer.source = req.body.source || customer.source;
+        customer.loyaltyPoints = req.body.loyaltyPoints !== undefined ? req.body.loyaltyPoints : customer.loyaltyPoints;
+        customer.notes = req.body.notes !== undefined ? req.body.notes : customer.notes;
+
+        // Handle address update
+        if (req.body.address) {
+            customer.address = {
+                street: req.body.address.street !== undefined ? req.body.address.street : customer.address.street,
+                area: req.body.address.area !== undefined ? req.body.address.area : customer.address.area,
+                city: req.body.address.city !== undefined ? req.body.address.city : customer.address.city,
+                pincode: req.body.address.pincode !== undefined ? req.body.address.pincode : customer.address.pincode,
+                state: req.body.address.state !== undefined ? req.body.address.state : customer.address.state
+            };
+        }
+
+        // Handle tags update
+        if (req.body.tags !== undefined) {
+            customer.tags = req.body.tags;
+        }
 
         const updatedCustomer = await customer.save();
         res.json({
             id: updatedCustomer._id,
-            name: updatedCustomer.name,
+            customerId: updatedCustomer.customerId,
+            fullName: updatedCustomer.fullName,
+            firstName: updatedCustomer.firstName,
+            lastName: updatedCustomer.lastName,
+            customerType: updatedCustomer.customerType,
+            gstin: updatedCustomer.gstin,
             email: updatedCustomer.email,
             phone: updatedCustomer.phone,
             address: updatedCustomer.address,
+            source: updatedCustomer.source,
+            tags: updatedCustomer.tags,
+            loyaltyPoints: updatedCustomer.loyaltyPoints,
+            notes: updatedCustomer.notes,
             totalVisits: updatedCustomer.totalVisits,
             totalSpent: updatedCustomer.totalSpent,
             due: updatedCustomer.due,
@@ -140,10 +238,43 @@ const deleteCustomer = asyncHandler(async (req, res) => {
     }
 });
 
+// @desc    Search for duplicate customers by phone or email
+// @route   GET /customers/search-duplicates?query=<phone_or_email>
+// @access  Private
+const searchDuplicates = asyncHandler(async (req, res) => {
+    const { query } = req.query;
+
+    if (!query || query.length < 3) {
+        return res.json([]);
+    }
+
+    // Search by phone or email
+    const customers = await Customer.find({
+        userId: req.user._id,
+        $or: [
+            { phone: { $regex: query, $options: 'i' } },
+            { email: { $regex: query, $options: 'i' } }
+        ]
+    })
+        .limit(3)
+        .select('_id customerId firstName lastName phone email');
+
+    const response = customers.map(c => ({
+        id: c._id,
+        customerId: c.customerId,
+        fullName: `${c.firstName} ${c.lastName}`.trim(),
+        phone: c.phone,
+        email: c.email
+    }));
+
+    res.json(response);
+});
+
 module.exports = {
     getCustomers,
     getCustomerById,
     createCustomer,
     updateCustomer,
     deleteCustomer,
+    searchDuplicates,
 };

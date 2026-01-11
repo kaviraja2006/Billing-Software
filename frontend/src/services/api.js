@@ -62,6 +62,7 @@ const services = {
         create: (data) => api.post('/customers', data),
         update: (id, data) => api.put(`/customers/${id}`, data),
         delete: (id) => api.delete(`/customers/${id}`),
+        searchDuplicates: (query) => api.get('/customers/search-duplicates', { params: { query } }),
     },
     products: {
         getAll: () => api.get('/products'),
