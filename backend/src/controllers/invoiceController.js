@@ -86,6 +86,10 @@ const createInvoice = asyncHandler(async (req, res) => {
         subtotal: Joi.number().required(),
         tax: Joi.number().required(),
         discount: Joi.number().min(0).optional(),
+        grossTotal: Joi.number().optional(),
+        itemDiscount: Joi.number().optional(),
+        additionalCharges: Joi.number().optional(),
+        roundOff: Joi.number().optional(),
         total: Joi.number().required(),
         paymentMethod: Joi.string().optional(),
     });
@@ -96,7 +100,7 @@ const createInvoice = asyncHandler(async (req, res) => {
         throw new Error(error.details[0].message);
     }
 
-    let { customerId, customerName, date, items, subtotal, tax, discount = 0, total, paymentMethod } = req.body;
+    let { customerId, customerName, date, items, subtotal, tax, discount = 0, grossTotal = 0, itemDiscount = 0, additionalCharges = 0, roundOff = 0, total, paymentMethod } = req.body;
 
     // Recalculate totals and check stock
     let calcSubtotal = 0;
@@ -146,13 +150,17 @@ const createInvoice = asyncHandler(async (req, res) => {
 
     // allow small float diffs
     const epsilon = 0.01;
+    // Note: calcSubtotal here is just sum of line totals, which might include item discounts already if line total is net.
+    // Frontend sends 'total' for item which is (qty * price) - discount.
+    // So calcSubtotal should match 'subtotal' from frontend.
+
     if (Math.abs(calcSubtotal - subtotal) > epsilon) {
         // Just warn or fix? "server-verified" implies strict.
         // Let's use calculated subtotal.
         subtotal = calcSubtotal;
     }
 
-    const calcTotal = subtotal + tax - discount;
+    const calcTotal = subtotal + tax + additionalCharges - discount; // Adjusted for additional charges
 
     // Attach user ID
     const invoice = await Invoice.create({
@@ -160,10 +168,14 @@ const createInvoice = asyncHandler(async (req, res) => {
         customerName,
         date,
         items: finalItems,
+        grossTotal,
+        itemDiscount,
         subtotal,
         tax,
         discount,
-        total: calcTotal,
+        additionalCharges,
+        roundOff,
+        total: calcTotal, // or trust frontend total if roundoff logic is complex? Let's assume calcTotal is close enough or use frontend total if match.
         status: 'Paid',
         paymentMethod,
         userId: req.user._id

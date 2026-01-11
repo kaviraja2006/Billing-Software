@@ -4,6 +4,7 @@ import { Button } from '../../../components/ui/Button';
 import { Search, User, ChevronRight, Calculator, Printer } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '../../../lib/utils';
+import CalculatorModal from './CalculatorModal';
 
 const BillingSidebar = ({
     customer,
@@ -16,14 +17,25 @@ const BillingSidebar = ({
 }) => {
     const currentDate = new Date().toLocaleDateString('en-IN'); // DD/MM/YYYY format
     const [printFormat, setPrintFormat] = useState('80mm');
+    const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
 
     return (
         <div className="w-full lg:w-96 flex flex-col gap-4 h-full">
             {/* Date Block */}
-            <Card className="p-3 bg-white shadow-sm border rounded-lg flex justify-between items-center">
+            <Card
+                className="p-3 bg-white shadow-sm border rounded-lg flex justify-between items-center cursor-pointer hover:border-blue-400 transition-colors group"
+                onClick={() => setIsCalculatorOpen(true)}
+            >
                 <span className="text-sm font-medium text-slate-700">{currentDate}</span>
-                <Calculator size={16} className="text-blue-600" />
+                <div className="p-1.5 bg-blue-50 rounded-md group-hover:bg-blue-100 transition-colors">
+                    <Calculator size={18} className="text-blue-600" />
+                </div>
             </Card>
+
+            <CalculatorModal
+                isOpen={isCalculatorOpen}
+                onClose={() => setIsCalculatorOpen(false)}
+            />
 
             {/* Customer Search Block */}
             <div className="relative">
@@ -49,18 +61,33 @@ const BillingSidebar = ({
             </div>
 
             {/* Totals Block */}
-            <Card className="p-4 bg-white border-blue-100 shadow-sm space-y-2">
-                <div className="flex items-center gap-3 border-b pb-3 mb-2">
-                    <div className="p-3 bg-blue-50 rounded-lg text-blue-600">
-                        <User size={24} />
+            {/* Totals Block */}
+            <Card className="p-4 bg-white border-blue-100 shadow-sm">
+                <div className="space-y-2 text-sm">
+                    <div className="flex justify-between text-slate-600">
+                        <span>Subtotal</span>
+                        <span>₹ {(totals.grossTotal || 0).toFixed(2)}</span>
                     </div>
-                    <div>
-                        <div className="text-2xl font-bold text-slate-900">Total ₹ {totals.total.toFixed(2)}</div>
-                        <div className="text-xs text-slate-500">Items: 0, Quantity: 0</div>
+                    <div className="flex justify-between text-green-600">
+                        <span>Item Discount</span>
+                        <span>- ₹ {(totals.itemDiscount || 0).toFixed(2)}</span>
                     </div>
-                    <Button variant="ghost" size="sm" className="ml-auto text-blue-600 hover:text-blue-700">
-                        Full Breakup <ChevronRight size={14} />
-                    </Button>
+                    <div className="flex justify-between text-green-600">
+                        <span>Bill Discount</span>
+                        <span>- ₹ {(totals.discount || 0).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-slate-600">
+                        <span>Tax</span>
+                        <span>₹ {(totals.tax || 0).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-slate-600">
+                        <span>Rounding</span>
+                        <span>₹ {(totals.roundOff || 0).toFixed(2)}</span>
+                    </div>
+                    <div className="border-t pt-2 mt-2 flex justify-between items-end">
+                        <span className="font-bold text-slate-900 text-lg">Grand Total</span>
+                        <span className="font-bold text-slate-900 text-2xl">₹ {totals.total.toFixed(2)}</span>
+                    </div>
                 </div>
             </Card>
 

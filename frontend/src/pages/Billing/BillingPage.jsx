@@ -27,7 +27,7 @@ const BillingPage = () => {
             id: 1,
             customer: null,
             cart: [],
-            totals: { subtotal: 0, tax: 0, discount: 0, total: 0, roundOff: 0 },
+            totals: { grossTotal: 0, itemDiscount: 0, subtotal: 0, tax: 0, discount: 0, additionalCharges: 0, roundOff: 0, total: 0 },
             paymentMode: 'Cash',
             amountReceived: 0,
             remarks: '',
@@ -58,7 +58,7 @@ const BillingPage = () => {
             id: newId,
             customer: null,
             cart: [],
-            totals: { subtotal: 0, tax: 0, discount: 0, total: 0, roundOff: 0 },
+            totals: { grossTotal: 0, itemDiscount: 0, subtotal: 0, tax: 0, discount: 0, additionalCharges: 0, roundOff: 0, total: 0 },
             paymentMode: 'Cash',
             amountReceived: 0,
             remarks: '',
@@ -78,7 +78,7 @@ const BillingPage = () => {
                 id: 1,
                 customer: null,
                 cart: [],
-                totals: { subtotal: 0, tax: 0, discount: 0, total: 0, roundOff: 0 },
+                totals: { grossTotal: 0, itemDiscount: 0, subtotal: 0, tax: 0, discount: 0, additionalCharges: 0, roundOff: 0, total: 0 },
                 paymentMode: 'Cash',
                 amountReceived: 0,
                 remarks: '',
@@ -106,11 +106,23 @@ const BillingPage = () => {
     };
 
     const calculateTotals = (cart, billDiscount = 0, additionalCharges = 0, loyaltyPointsDiscount = 0) => {
-        const subtotal = cart.reduce((acc, item) => acc + item.total, 0);
+        const grossTotal = cart.reduce((acc, item) => acc + (item.quantity * (item.price || item.sellingPrice || 0)), 0);
+        const itemDiscount = cart.reduce((acc, item) => acc + (item.discount || 0), 0);
+        const subtotal = grossTotal - itemDiscount;
+
         // Tax placeholder (e.g. 18% on subtotal) - Optional, keep simple for now or implement if needed
         const totalBeforeDiscounts = subtotal + additionalCharges;
         const total = Math.max(0, totalBeforeDiscounts - billDiscount - loyaltyPointsDiscount);
-        return { subtotal, tax: 0, discount: billDiscount + loyaltyPointsDiscount, additionalCharges, total, roundOff: 0 };
+        return {
+            grossTotal,
+            itemDiscount,
+            subtotal,
+            tax: 0,
+            discount: billDiscount + loyaltyPointsDiscount,
+            additionalCharges,
+            total,
+            roundOff: 0
+        };
     };
 
     // --- Calculations ---
@@ -304,11 +316,15 @@ const BillingPage = () => {
                     price: parseFloat(item.price || item.sellingPrice) || 0,
                     total: parseFloat(item.total) || 0
                 })),
+                grossTotal: parseFloat(currentBill.totals.grossTotal) || 0,
+                itemDiscount: parseFloat(currentBill.totals.itemDiscount) || 0,
                 subtotal: parseFloat(currentBill.totals.subtotal) || 0,
                 tax: parseFloat(currentBill.totals.tax) || 0,
                 // Total discount = Bill Discount + Loyalty + (Sum of item discounts if backend logic requires separate handling, but simpler to send net values or explicit fields)
                 // Backend schema has single 'discount' field usually.
                 discount: parseFloat(currentBill.totals.discount) || 0,
+                additionalCharges: parseFloat(currentBill.totals.additionalCharges) || 0,
+                roundOff: parseFloat(currentBill.totals.roundOff) || 0,
                 total: parseFloat(currentBill.totals.total) || 0,
                 paymentMethod: currentBill.paymentMode || 'Cash',
                 // Remarks and Additional Charges might need to be stored in comments or extra fields if backend supports them.
@@ -464,6 +480,10 @@ const BillingPage = () => {
                         removeItem={removeItem}
                         selectedItemId={selectedItemId}
                         onRowClick={handleRowClick}
+                        onDiscountClick={(id) => {
+                            setSelectedItemId(id);
+                            setModals(prev => ({ ...prev, itemDiscount: true }));
+                        }}
                     />
 
                     {/* Mobile Floating Pay Button (only on Items tab) */}
