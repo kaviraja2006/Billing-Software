@@ -29,20 +29,25 @@ const CustomerSearchModal = ({ isOpen, onClose, onSelect }) => {
     };
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title="Search Customer">
-            <div className="space-y-4">
-                <div className="relative">
+        <Modal
+            isOpen={isOpen}
+            onClose={onClose}
+            title="Search Customer"
+            className="w-[60vw] max-w-4xl h-[70vh]"
+        >
+            <div className="space-y-4 h-full flex flex-col">
+                <div className="relative shrink-0">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4" />
                     <Input
                         ref={inputRef}
                         placeholder="Search by Name or Phone..."
-                        className="pl-10"
+                        className="pl-10 h-12 text-lg"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
 
-                <div className="border rounded-md max-h-[300px] overflow-y-auto">
+                <div className="border rounded-md flex-1 overflow-y-auto">
                     {/* Walk-in Option */}
                     <div
                         tabIndex={0}

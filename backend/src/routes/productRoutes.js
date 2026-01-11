@@ -6,7 +6,8 @@ const {
     createProduct,
     updateProduct,
     deleteProduct,
-    fixIndexes
+    fixIndexes,
+    getProductStats
 } = require('../controllers/productController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -14,6 +15,9 @@ const { protect } = require('../middleware/authMiddleware');
 router.get('/fix-indexes', fixIndexes);
 
 router.route('/').get(protect, getProducts).post(protect, createProduct);
+
+router.get('/:id/stats', protect, getProductStats);
+
 router
     .route('/:id')
     .get(protect, getProductById)

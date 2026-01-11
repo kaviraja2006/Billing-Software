@@ -22,6 +22,15 @@ const productSchema = mongoose.Schema(
         taxRate: { type: Number, default: 0 },
         costPrice: { type: Number, default: 0 },
         minStock: { type: Number, default: 10 },
+        expiryDate: { type: Date },
+        isActive: { type: Boolean, default: true },
+        variants: [{
+            name: { type: String }, // e.g., "Size", "Color"
+            options: [{ type: String }], // e.g., ["S", "M", "L"]
+            price: { type: Number },
+            stock: { type: Number },
+            sku: { type: String }
+        }],
         userId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',
@@ -35,6 +44,10 @@ const productSchema = mongoose.Schema(
 
 // Compound index to ensure SKU is unique per user
 productSchema.index({ sku: 1, userId: 1 }, { unique: true });
+// Compound index to ensure Barcode is unique per user (sparse to allow nulls if multiple items define no barcode)
+productSchema.index({ barcode: 1, userId: 1 }, { unique: true, sparse: true });
+// Compound index to ensure Variant SKU is unique per user
+productSchema.index({ "variants.sku": 1, userId: 1 }, { unique: true, sparse: true });
 
 const Product = mongoose.model('Product', productSchema);
 

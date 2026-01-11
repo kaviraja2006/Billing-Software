@@ -45,11 +45,15 @@ export const ProductProvider = ({ children }) => {
     const addProduct = async (productData) => {
         try {
             // Ensure sku is present for backend compatibility (it requires unique sku)
+            // Strip UI-only fields like 'hasVariants'
+            const { hasVariants, ...rest } = productData;
+
             const payload = {
-                ...productData,
+                ...rest,
                 price: parseFloat(productData.price) || 0,
                 stock: parseInt(productData.stock) || 0,
-                sku: productData.barcode || `SKU-${Date.now()}-${Math.floor(Math.random() * 1000)}`
+                sku: productData.barcode || `SKU-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+                expiryDate: productData.expiryDate || null
             };
 
             const response = await services.products.create(payload);
@@ -64,7 +68,7 @@ export const ProductProvider = ({ children }) => {
 
     const addManyProducts = async (productsArray) => {
         const addedProducts = [];
-        // Sequential upload to mock API
+        // Sequential upload to API
         for (const rawP of productsArray) {
             // Normalize keys: trim and lowercase
             const p = {};
@@ -109,7 +113,17 @@ export const ProductProvider = ({ children }) => {
 
     const updateProduct = async (id, updatedData) => {
         try {
-            const response = await services.products.update(id, updatedData);
+            const { hasVariants, ...rest } = updatedData;
+            const payload = {
+                ...rest,
+                price: parseFloat(updatedData.price) || 0,
+                stock: parseInt(updatedData.stock) || 0,
+                costPrice: parseFloat(updatedData.costPrice) || 0,
+                taxRate: parseFloat(updatedData.taxRate) || 0,
+                minStock: parseInt(updatedData.minStock) || 0,
+                expiryDate: updatedData.expiryDate || null
+            };
+            const response = await services.products.update(id, payload);
             const updatedProduct = response.data;
             setProducts(prev => prev.map(p => p.id === id ? updatedProduct : p));
             return updatedProduct;

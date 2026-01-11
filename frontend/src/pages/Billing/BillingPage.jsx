@@ -343,10 +343,10 @@ const BillingPage = () => {
         'F12': handleF12,
         'Ctrl+P': handleSavePrint,
         'Control+p': handleSavePrint,
-        'Ctrl+T': addNewBill,
-        'Control+t': addNewBill,
-        'Ctrl+W': () => closeBill(activeBillId),
-        'Control+w': () => closeBill(activeBillId),
+        'Alt+T': addNewBill,            // Changed from Ctrl+T to avoid browser New Tab conflict
+        'Alt+t': addNewBill,
+        'Alt+W': () => closeBill(activeBillId), // Changed from Ctrl+W to avoid browser Close Tab conflict
+        'Alt+w': () => closeBill(activeBillId),
         'F11': () => {
             setModals(prev => ({ ...prev, customerSearch: true }));
         }
@@ -382,7 +382,7 @@ const BillingPage = () => {
                                 }`}
                         >
                             <span>#{bill.id}</span>
-                            {bill.id === activeBillId && <span className="text-xs text-slate-400 font-normal ml-2">Ctrl+W</span>}
+                            {bill.id === activeBillId && <span className="text-xs text-slate-400 font-normal ml-2">Alt+W</span>}
                             <X
                                 size={12}
                                 className="text-slate-400 hover:text-red-500 cursor-pointer ml-2"
@@ -394,7 +394,7 @@ const BillingPage = () => {
                         onClick={addNewBill}
                         className="flex items-center gap-1 px-3 py-1.5 text-slate-600 hover:bg-slate-100 rounded-md text-xs font-semibold mb-1"
                     >
-                        <Plus size={14} /> New Bill [Ctrl+T]
+                        <Plus size={14} /> New Bill [Alt+T]
                     </button>
                 </div>
 

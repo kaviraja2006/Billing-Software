@@ -1,5 +1,6 @@
 const asyncHandler = require('express-async-handler');
 const Product = require('../models/productModel');
+const Invoice = require('../models/invoiceModel');
 const Joi = require('joi');
 
 // @desc    Get all products
@@ -66,6 +67,15 @@ const createProduct = asyncHandler(async (req, res) => {
         taxRate: Joi.number().optional(),
         costPrice: Joi.number().optional(),
         minStock: Joi.number().optional(),
+        expiryDate: Joi.date().allow(null).optional(),
+        isActive: Joi.boolean().default(true).optional(),
+        variants: Joi.array().items(Joi.object({
+            name: Joi.string().required(),
+            options: Joi.array().items(Joi.string()).required(),
+            price: Joi.number().optional(),
+            stock: Joi.number().optional(),
+            sku: Joi.string().optional()
+        })).optional()
     });
 
     const { error } = schema.validate(req.body);
@@ -74,7 +84,7 @@ const createProduct = asyncHandler(async (req, res) => {
         throw new Error(error.details[0].message);
     }
 
-    const { name, sku, category, price, stock, unit, brand, barcode, barcodeType, description, taxRate, costPrice, minStock } = req.body;
+    const { name, sku, category, price, stock, unit, brand, barcode, barcodeType, description, taxRate, costPrice, minStock, expiryDate, isActive, variants } = req.body;
 
     // Check if sku exists for this user (SKU should be unique per user, not globally)
     const productExists = await Product.findOne({ sku, userId: req.user._id });
@@ -83,13 +93,28 @@ const createProduct = asyncHandler(async (req, res) => {
         throw new Error('Product with this SKU already exists');
     }
 
+    // Check if barcode exists for this user (if provided)
+    if (barcode) {
+        const barcodeExists = await Product.findOne({ barcode, userId: req.user._id });
+        if (barcodeExists) {
+            res.status(400);
+            throw new Error('Product with this Barcode already exists');
+        }
+    }
+
+    // Auto-calculate stock from variants if they exist
+    let finalStock = stock;
+    if (variants && variants.length > 0) {
+        finalStock = variants.reduce((sum, v) => sum + (parseInt(v.stock) || 0), 0);
+    }
+
     // Attach user ID
     const product = await Product.create({
         name,
         sku,
         category,
         price,
-        stock,
+        stock: finalStock,
         unit,
         brand,
         barcode,
@@ -98,6 +123,9 @@ const createProduct = asyncHandler(async (req, res) => {
         taxRate,
         costPrice,
         minStock,
+        expiryDate,
+        isActive,
+        variants,
         userId: req.user._id
     });
 
@@ -115,7 +143,10 @@ const createProduct = asyncHandler(async (req, res) => {
         description: product.description,
         taxRate: product.taxRate,
         costPrice: product.costPrice,
-        minStock: product.minStock
+        minStock: product.minStock,
+        expiryDate: product.expiryDate,
+        isActive: product.isActive,
+        variants: product.variants
     });
 });
 
@@ -128,18 +159,42 @@ const updateProduct = asyncHandler(async (req, res) => {
 
     if (product) {
         product.name = req.body.name || product.name;
-        product.sku = req.body.sku || product.sku;
+        product.sku = req.body.sku || product.sku; // Optional update
         product.category = req.body.category || product.category;
-        product.price = req.body.price !== undefined ? req.body.price : product.price;
-        product.stock = req.body.stock !== undefined ? req.body.stock : product.stock;
-        product.unit = req.body.unit || product.unit;
         product.brand = req.body.brand !== undefined ? req.body.brand : product.brand;
+
+        product.price = req.body.price !== undefined ? Number(req.body.price) : product.price;
+        product.stock = req.body.stock !== undefined ? Number(req.body.stock) : product.stock;
+
+        product.unit = req.body.unit !== undefined ? req.body.unit : product.unit;
         product.barcode = req.body.barcode !== undefined ? req.body.barcode : product.barcode;
         product.barcodeType = req.body.barcodeType || product.barcodeType;
         product.description = req.body.description !== undefined ? req.body.description : product.description;
-        product.taxRate = req.body.taxRate !== undefined ? req.body.taxRate : product.taxRate;
-        product.costPrice = req.body.costPrice !== undefined ? req.body.costPrice : product.costPrice;
-        product.minStock = req.body.minStock !== undefined ? req.body.minStock : product.minStock;
+
+        product.taxRate = req.body.taxRate !== undefined ? Number(req.body.taxRate) : product.taxRate;
+        product.costPrice = req.body.costPrice !== undefined ? Number(req.body.costPrice) : product.costPrice;
+        product.minStock = req.body.minStock !== undefined ? Number(req.body.minStock) : product.minStock;
+
+        product.expiryDate = req.body.expiryDate !== undefined ? req.body.expiryDate : product.expiryDate;
+        product.isActive = req.body.isActive !== undefined ? req.body.isActive : product.isActive;
+
+        product.variants = req.body.variants || product.variants;
+
+        // Auto-calculate stock if variants exist (either updated or existing)
+        if (product.variants && product.variants.length > 0) {
+            product.stock = product.variants.reduce((sum, v) => sum + (parseInt(v.stock) || 0), 0);
+        } else {
+            product.stock = req.body.stock !== undefined ? req.body.stock : product.stock;
+        }
+
+        // Check for duplicate barcode on update if it's being changed
+        if (req.body.barcode && req.body.barcode !== product.barcode) {
+            const barcodeExists = await Product.findOne({ barcode: req.body.barcode, userId: req.user._id });
+            if (barcodeExists) {
+                res.status(400);
+                throw new Error('Product with this Barcode already exists');
+            }
+        }
 
         const updatedProduct = await product.save();
         res.json({
@@ -153,7 +208,13 @@ const updateProduct = asyncHandler(async (req, res) => {
             unit: updatedProduct.unit,
             barcode: updatedProduct.barcode,
             barcodeType: updatedProduct.barcodeType,
-            description: updatedProduct.description
+            description: updatedProduct.description,
+            taxRate: updatedProduct.taxRate,
+            costPrice: updatedProduct.costPrice,
+            minStock: updatedProduct.minStock,
+            expiryDate: updatedProduct.expiryDate,
+            isActive: updatedProduct.isActive,
+            variants: updatedProduct.variants
         });
     } else {
         res.status(404);
@@ -194,11 +255,54 @@ const fixIndexes = asyncHandler(async (req, res) => {
     }
 });
 
+// @desc    Get product stats (sales, history)
+// @route   GET /products/:id/stats
+// @access  Private
+const getProductStats = asyncHandler(async (req, res) => {
+    const productId = req.params.id;
+
+    // Get all invoices for this user that contain this product
+    const invoices = await Invoice.find({
+        userId: req.user._id,
+        "items.productId": productId
+    }).sort({ date: -1 });
+
+    let totalSold = 0;
+    let monthlySales = 0;
+    const now = new Date();
+    const thirtyDaysAgo = new Date(new Date().setDate(now.getDate() - 30));
+    let lastSoldDate = null;
+
+    if (invoices.length > 0) {
+        lastSoldDate = invoices[0].date;
+
+        invoices.forEach(inv => {
+            const item = inv.items.find(i => i.productId.toString() === productId);
+            if (item) {
+                const qty = item.quantity || 0;
+                totalSold += qty;
+
+                if (new Date(inv.date) >= thirtyDaysAgo) {
+                    monthlySales += qty;
+                }
+            }
+        });
+    }
+
+    res.json({
+        lastSold: lastSoldDate,
+        totalSold,
+        monthlySales
+    });
+});
+
 module.exports = {
     getProducts,
     getProductById,
     createProduct,
     updateProduct,
     deleteProduct,
-    fixIndexes
+    deleteProduct,
+    fixIndexes,
+    getProductStats
 };

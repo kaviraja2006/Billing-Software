@@ -28,6 +28,15 @@ const CardTitle = React.forwardRef(({ className, ...props }, ref) => (
 ));
 CardTitle.displayName = "CardTitle";
 
+const CardDescription = React.forwardRef(({ className, ...props }, ref) => (
+    <p
+        ref={ref}
+        className={cn("text-sm text-slate-500", className)}
+        {...props}
+    />
+));
+CardDescription.displayName = "CardDescription";
+
 const CardContent = React.forwardRef(({ className, ...props }, ref) => (
     <div ref={ref} className={cn("p-6 pt-0", className)} {...props} />
 ));
@@ -42,4 +51,4 @@ const CardFooter = React.forwardRef(({ className, ...props }, ref) => (
 ));
 CardFooter.displayName = "CardFooter";
 
-export { Card, CardHeader, CardFooter, CardTitle, CardContent };
+export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent };

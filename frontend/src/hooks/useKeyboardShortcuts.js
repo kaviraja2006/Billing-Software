@@ -7,8 +7,8 @@ const useKeyboardShortcuts = (keyMap) => {
             const tagName = document.activeElement.tagName.toLowerCase();
             const isInputFocused = tagName === 'input' || tagName === 'textarea';
 
-            // Allow F-keys even in inputs, but prevent default browser behavior
-            if (event.key.startsWith('F') || (event.ctrlKey && ['p', 'm', 't', 'w'].includes(event.key.toLowerCase()))) {
+            // Allow F-keys and shortcuts (Alt/Ctrl) even in inputs
+            if (event.key.startsWith('F') || event.altKey || (event.ctrlKey && ['p', 'm', 't', 'w'].includes(event.key.toLowerCase()))) {
                 event.preventDefault();
             } else if (isInputFocused) {
                 // If typing in input and not a special hotkey, let it behave normally.

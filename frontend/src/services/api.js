@@ -1,16 +1,7 @@
 import axios from 'axios';
-import { mockAuthService } from './mock/auth';
-import { mockCustomerService } from './mock/customers';
-import { mockProductService } from './mock/products';
-import { mockBillingService } from './mock/billing';
-import { mockInvoiceService } from './mock/invoices';
-import { mockExpenseService } from './mock/expenses';
-import { mockReportService } from './mock/reports'; // Will create later
-import { mockSettingsService } from './mock/settings'; // Will create later
 
-const USE_MOCK = false; // Set to true to use mock services, false to use real API
-//const API_BASE_URL = 'http://localhost:5000'; // Switched to local for development
-const API_BASE_URL = 'https://billing-software-o1qb.onrender.com'; // Hosted on Render
+const API_BASE_URL = 'http://localhost:5000'; // Switched to local for development
+//const API_BASE_URL = 'https://billing-software-o1qb.onrender.com'; // Hosted on Render
 
 const api = axios.create({
     baseURL: API_BASE_URL,
@@ -56,50 +47,50 @@ api.interceptors.response.use(
     }
 );
 
-// Mock Service Wrapper
+// Service Wrapper
 const services = {
-    auth: USE_MOCK ? mockAuthService : {
+    auth: {
         login: (credentials) => api.post('/auth/login', credentials),
         register: (data) => api.post('/auth/register', data),
         logout: () => api.post('/auth/logout'),
         getCurrentUser: () => api.get('/auth/me'),
     },
-    customers: USE_MOCK ? mockCustomerService : {
+    customers: {
         getAll: () => api.get('/customers'),
         getById: (id) => api.get(`/customers/${id}`),
         create: (data) => api.post('/customers', data),
         update: (id, data) => api.put(`/customers/${id}`, data),
         delete: (id) => api.delete(`/customers/${id}`),
     },
-    products: USE_MOCK ? mockProductService : {
+    products: {
         getAll: () => api.get('/products'),
         getById: (id) => api.get(`/products/${id}`),
         create: (data) => api.post('/products', data),
         update: (id, data) => api.put(`/products/${id}`, data),
         delete: (id) => api.delete(`/products/${id}`),
+        getStats: (id) => api.get(`/products/${id}/stats`),
     },
-    billing: USE_MOCK ? mockBillingService : {
+    billing: {
         createInvoice: (data) => api.post('/invoices', data),
-        // Billing usually results in an invoice creation
     },
-    invoices: USE_MOCK ? mockInvoiceService : {
+    invoices: {
         getAll: (params) => api.get('/invoices', { params }),
         getById: (id) => api.get(`/invoices/${id}`),
         delete: (id) => api.delete(`/invoices/${id}`),
     },
-    expenses: USE_MOCK ? mockExpenseService : {
+    expenses: {
         getAll: () => api.get('/expenses'),
         create: (data) => api.post('/expenses', data),
         delete: (id) => api.delete(`/expenses/${id}`),
     },
-    reports: USE_MOCK ? mockReportService : {
-        getDashboardStats: () => api.get('/reports/dashboard'),
-        getFinancialStats: () => api.get('/reports/financials'),
-        getSalesTrend: () => api.get('/reports/sales-trend'),
-        getPaymentMethodStats: () => api.get('/reports/payment-methods'),
-        getTopProducts: () => api.get('/reports/top-products'),
+    reports: {
+        getDashboardStats: (params) => api.get('/reports/dashboard', { params }),
+        getFinancials: (params) => api.get('/reports/financials', { params }),
+        getSalesTrend: (params) => api.get('/reports/sales-trend', { params }),
+        getPaymentMethodStats: (params) => api.get('/reports/payment-methods', { params }),
+        getTopProducts: (params) => api.get('/reports/top-products', { params }),
     },
-    settings: USE_MOCK ? mockSettingsService : {
+    settings: {
         getSettings: () => api.get('/settings'),
         updateSettings: (data) => api.put('/settings', data),
     },

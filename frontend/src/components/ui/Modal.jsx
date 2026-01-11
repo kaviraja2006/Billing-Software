@@ -45,13 +45,13 @@ const Modal = ({ isOpen, onClose, title, children, className, size = 'md' }) => 
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: 20 }}
                             className={cn(
-                                "pointer-events-auto relative w-full overflow-hidden rounded-xl bg-white shadow-2xl ring-1 ring-slate-900/5",
+                                "pointer-events-auto relative flex flex-col overflow-hidden rounded-xl bg-white shadow-2xl ring-1 ring-slate-900/5",
                                 sizes[size],
                                 className
                             )}
                         >
                             {/* Header */}
-                            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+                            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 shrink-0">
                                 <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
                                 <button
                                     onClick={onClose}
@@ -62,7 +62,7 @@ const Modal = ({ isOpen, onClose, title, children, className, size = 'md' }) => 
                             </div>
 
                             {/* Body */}
-                            <div className="p-6 overflow-y-auto max-h-[80vh]">
+                            <div className="p-6 overflow-y-auto flex-1 h-full">
                                 {children}
                             </div>
                         </motion.div>

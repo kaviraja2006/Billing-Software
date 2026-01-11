@@ -41,16 +41,21 @@ const Sidebar = ({ isOpen = true, toggleSidebar, isMobile, onCloseMobile }) => {
     return (
         <div className="flex h-full w-full flex-col border-r border-theme bg-card shadow-sm">
             {/* Logo Area */}
+            {/* Logo Area */}
             <div className={cn("flex h-16 items-center border-b border-theme transition-all", isOpen ? "justify-between px-4" : "justify-center px-0")}>
-                <div className="flex items-center gap-2">
+                <div
+                    className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+                    onClick={toggleSidebar}
+                    aria-label="Toggle sidebar"
+                >
                     <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-main text-white shadow-sm">
                         <Receipt size={20} strokeWidth={2.5} />
                     </div>
                     {isOpen && (
-                        <span className="text-xl font-bold text-body-primary tracking-tight">POS System</span>
+                        <span className="text-xl font-bold text-body-primary tracking-tight">Zilling</span>
                     )}
                 </div>
-                {/* Desktop Toggle */}
+                {/* Mobile Close Toggle */}
                 <div className="flex items-center gap-2">
                     {onCloseMobile && (
                         <button
@@ -58,15 +63,6 @@ const Sidebar = ({ isOpen = true, toggleSidebar, isMobile, onCloseMobile }) => {
                             className="md:hidden p-1.5 rounded-md hover:bg-slate-100 text-slate-600 hover:text-body-primary transition-colors"
                         >
                             <LogOut size={18} className="rotate-180" /> {/* temporary icon or X */}
-                        </button>
-                    )}
-                    {toggleSidebar && (
-                        <button
-                            onClick={toggleSidebar}
-                            className="hidden md:block p-1.5 rounded-md hover:bg-slate-100 text-slate-600 hover:text-body-primary transition-colors"
-                            aria-label="Toggle sidebar"
-                        >
-                            <Menu size={18} />
                         </button>
                     )}
                 </div>
