@@ -15,13 +15,15 @@ import {
     LogOut,
     Menu
 } from 'lucide-react';
+import { useNavigate } from "react-router-dom";
 
 const Sidebar = ({ isOpen = true, toggleSidebar, isMobile, onCloseMobile }) => {
     const { user, logout } = useAuth();
-
+    const navigate = useNavigate();
     const handleLogout = async () => {
-        await logout();
-    };
+    await logout();
+    navigate("/login", { replace: true });
+  };
     const navItems = [
         { label: 'Dashboard', icon: LayoutDashboard, path: '/' },
         { label: 'Billing', icon: Receipt, path: '/billing' },

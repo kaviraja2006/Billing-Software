@@ -2,6 +2,8 @@ console.log("Server file loaded"); // Debug: Confirm file loading
 require('dotenv').config();
 const { cloudinary } = require('./src/config/cloudinary');
 
+
+
 // Verify Cloudinary Connection
 cloudinary.api.ping((error, result) => {
     if (error) {

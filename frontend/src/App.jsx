@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from './components/layout/MainLayout';
 
 import Dashboard from './pages/Dashboard';
@@ -30,7 +30,7 @@ function App() {
           <ProductProvider>
             <ExpenseProvider>
               <SettingsProvider>
-                <BrowserRouter>
+                <HashRouter>
                   <Routes>
                     <Route path="/login" element={<LoginPage />} />
                     <Route path="/signup" element={<SignupPage />} />
@@ -52,7 +52,7 @@ function App() {
                       <Route path="*" element={<Navigate to="/" replace />} />
                     </Route>
                   </Routes>
-                </BrowserRouter>
+                </HashRouter>
               </SettingsProvider>
             </ExpenseProvider>
           </ProductProvider>
