@@ -72,12 +72,29 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // 4️⃣ Direct Login Helper (for OAuth / Instant Access)
+  const loginSuccess = (token, userData) => {
+    localStorage.setItem("token", token);
+    if (userData) {
+      localStorage.setItem("user", JSON.stringify(userData));
+      setUser(userData);
+    }
+    setAuthStatus("authenticated");
+    // If we don't have userData yet, we can trigger a fetch
+    if (!userData) {
+      services.auth.getCurrentUser()
+        .then(res => setUser(res.data))
+        .catch(console.error);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
         user,
         authStatus,
-        logout, // ✅ THIS WAS MISSING
+        logout,
+        loginSuccess, // ✅ EXPOSED
       }}
     >
       {children}

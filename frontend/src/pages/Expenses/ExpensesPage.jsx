@@ -10,7 +10,7 @@ import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '../../compo
 import { BulkActionsToolbar } from '../../components/Expenses/BulkActionsToolbar';
 import { RecurringBadge } from '../../components/Expenses/RecurringBadge';
 import { useExpenses } from '../../context/ExpenseContext';
-import { exportToCSV } from '../../utils/csvExport';
+import { exportToCSV } from '../../utils/exportService';
 import { SAMPLE_CATEGORIES } from '../../utils/expenseConstants';
 
 const ExpensesPage = () => {

@@ -48,53 +48,75 @@ api.interceptors.response.use(
     }
 );
 
+// Environment Detection
+const isElectron = window.electron !== undefined;
+
+// Helper to mimic Axios Response for Electron IPC
+const ipcResponse = async (promise) => {
+    try {
+        const data = await promise;
+        return { data, status: 200, statusText: 'OK' }; // Mimic Axios structure
+    } catch (error) {
+        console.error('Electron IPC Error:', error);
+        throw { response: { status: 500, data: { message: error.message } } };
+    }
+};
+
 // Service Wrapper
 const services = {
     auth: {
         login: async (credentials) => {
+            if (isElectron) {
+                // Mock Login for Offline Mode
+                return { user: { name: 'Offline User', role: 'admin' }, token: 'offline-token' };
+            }
             const response = await api.post('/auth/login', credentials);
             return response.data;
         },
         googleLogin: async (token) => {
+            // Not supported offline strictly, or handled via deep link
             const response = await api.post('/auth/google', { token });
             return response.data;
         },
         register: async (userData) => {
+            // Registration not supported offline? Or just create user locally?
             const response = await api.post('/auth/register', userData);
             return response.data;
         },
-        logout: () => api.post('/auth/logout'),
-        getCurrentUser: () => api.get('/auth/me'),
+        logout: () => isElectron ? Promise.resolve() : api.post('/auth/logout'),
+        getCurrentUser: () => isElectron ?
+            Promise.resolve({ data: { user: { name: 'Offline User' } } }) :
+            api.get('/auth/me'),
     },
     customers: {
-        getAll: () => api.get('/customers'),
-        getById: (id) => api.get(`/customers/${id}`),
-        create: (data) => api.post('/customers', data),
-        update: (id, data) => api.put(`/customers/${id}`, data),
-        delete: (id) => api.delete(`/customers/${id}`),
-        searchDuplicates: (query) => api.get('/customers/search-duplicates', { params: { query } }),
+        getAll: () => isElectron ? ipcResponse(window.electron.customer.findAll()) : api.get('/customers'),
+        getById: (id) => isElectron ? ipcResponse(window.electron.customer.findById(id)) : api.get(`/customers/${id}`),
+        create: (data) => isElectron ? ipcResponse(window.electron.customer.create(data)) : api.post('/customers', data),
+        update: (id, data) => isElectron ? ipcResponse(window.electron.customer.update(id, data)) : api.put(`/customers/${id}`, data),
+        delete: (id) => isElectron ? ipcResponse(window.electron.customer.delete(id)) : api.delete(`/customers/${id}`),
+        searchDuplicates: (query) => isElectron ? Promise.resolve({ data: [] }) : api.get('/customers/search-duplicates', { params: { query } }),
     },
     products: {
-        getAll: () => api.get('/products'),
-        getById: (id) => api.get(`/products/${id}`),
-        create: (data) => api.post('/products', data),
-        update: (id, data) => api.put(`/products/${id}`, data),
-        delete: (id) => api.delete(`/products/${id}`),
-        getStats: (id) => api.get(`/products/${id}/stats`),
+        getAll: () => isElectron ? ipcResponse(window.electron.product.findAll()) : api.get('/products'),
+        getById: (id) => isElectron ? ipcResponse(window.electron.product.findById(id)) : api.get(`/products/${id}`),
+        create: (data) => isElectron ? ipcResponse(window.electron.product.create(data)) : api.post('/products', data),
+        update: (id, data) => isElectron ? ipcResponse(window.electron.product.update(id, data)) : api.put(`/products/${id}`, data),
+        delete: (id) => isElectron ? ipcResponse(window.electron.product.delete(id)) : api.delete(`/products/${id}`),
+        getStats: (id) => isElectron ? Promise.resolve({ data: {} }) : api.get(`/products/${id}/stats`),
     },
     billing: {
-        createInvoice: (data) => api.post('/invoices', data),
+        createInvoice: (data) => isElectron ? ipcResponse(window.electron.invoice.create(data)) : api.post('/invoices', data),
     },
     invoices: {
-        getAll: (params) => api.get('/invoices', { params }),
-        getStats: (params) => api.get('/invoices/stats', { params }),
-        getById: (id) => api.get(`/invoices/${id}`),
-        update: (id, data) => api.put(`/invoices/${id}`, data),
-        delete: (id) => api.delete(`/invoices/${id}`),
-        bulkDelete: (ids) => api.post('/invoices/bulk-delete', { ids }),
+        getAll: (params) => isElectron ? ipcResponse(window.electron.invoice.findAll(params)) : api.get('/invoices', { params }),
+        getStats: (params) => isElectron ? Promise.resolve({ data: {} }) : api.get('/invoices/stats', { params }),
+        getById: (id) => isElectron ? ipcResponse(window.electron.invoice.findById(id)) : api.get(`/invoices/${id}`),
+        update: (id, data) => isElectron ? ipcResponse(window.electron.invoice.update(id, data)) : api.put(`/invoices/${id}`, data),
+        delete: (id) => isElectron ? ipcResponse(window.electron.invoice.delete(id)) : api.delete(`/invoices/${id}`),
+        bulkDelete: (ids) => isElectron ? Promise.resolve({ data: {} }) : api.post('/invoices/bulk-delete', { ids }),
     },
     expenses: {
-        getAll: () => api.get('/expenses'),
+        getAll: () => api.get('/expenses'), // Not implementing offline expenses yet
         create: (data) => api.post('/expenses', data),
         update: (id, data) => api.put(`/expenses/${id}`, data),
         delete: (id) => api.delete(`/expenses/${id}`),
@@ -110,7 +132,7 @@ const services = {
         },
     },
     reports: {
-        getDashboardStats: (params) => api.get('/reports/dashboard', { params }),
+        getDashboardStats: (params) => isElectron ? Promise.resolve({ data: { totalSales: 0, totalInvoices: 0 } }) : api.get('/reports/dashboard', { params }),
         getFinancials: (params) => api.get('/reports/financials', { params }),
         getSalesTrend: (params) => api.get('/reports/sales-trend', { params }),
         getPaymentMethodStats: (params) => api.get('/reports/payment-methods', { params }),
@@ -118,8 +140,8 @@ const services = {
         getCustomerMetrics: (params) => api.get('/reports/customers', { params }),
     },
     settings: {
-        getSettings: () => api.get('/settings'),
-        updateSettings: (data) => api.put('/settings', data),
+        getSettings: () => isElectron ? ipcResponse(window.electron.settings.getSettings()) : api.get('/settings'),
+        updateSettings: (data) => isElectron ? ipcResponse(window.electron.settings.updateSettings(data)) : api.put('/settings', data),
     },
 };
 

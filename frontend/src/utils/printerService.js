@@ -1,11 +1,26 @@
+/**
+ * Printer Service
+ * Handles receipt printing for both Thermal and A4 formats.
+ * Replaces legacy printer.js and printReceipt.js
+ */
+
 export const printReceipt = (invoice, format = '80mm', settings = {}) => {
     if (!invoice) return;
 
     // Destructure Settings with Defaults
-    const store = settings.store || {};
+    const store = settings.store || {
+        name: settings.name || 'MY STORE', // Fallback for legacy calls
+        address: settings.address,
+        contact: settings.contact,
+        email: settings.email,
+        website: settings.website,
+        footer: settings.footer,
+        logoUrl: settings.logoUrl
+    };
+
+    // Support legacy flat settings object
     const invoiceSettings = settings.invoice || {};
     const taxSettings = settings.tax || {};
-    // const defaults = settings.defaults || {}; // Unused for now
 
     // Helper: Format Currency
     const formatCurrency = (amount) => {
@@ -24,7 +39,7 @@ export const printReceipt = (invoice, format = '80mm', settings = {}) => {
         return parts.join(', ');
     };
 
-    const isThermal = format.includes('Thermal') || invoiceSettings.paperSize?.includes('Thermal');
+    const isThermal = ['80mm', '58mm', 'Thermal'].some(t => format.includes(t)) || invoiceSettings.paperSize?.includes('Thermal');
 
     // --- Styles Generation ---
     const getStyles = () => {
@@ -70,9 +85,6 @@ export const printReceipt = (invoice, format = '80mm', settings = {}) => {
                 position: fixed; top: 30%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg); 
                 font-size: 80px; opacity: 0.05; font-weight: bold; pointer-events: none; white-space: nowrap; z-index:-1;
             }
-            .tax-breakup { font-size: 10px; margin-top: 10px; color: #555; width: 100%; border-top: 1px dotted #ccc; }
-            .tax-breakup th, .tax-breakup td { border: none; padding: 2px; text-align: right; }
-            .tax-breakup th:first-child, .tax-breakup td:first-child { text-align: left; }
             
             @media print {
                 .no-print { display: none; }
@@ -86,7 +98,7 @@ export const printReceipt = (invoice, format = '80mm', settings = {}) => {
         <div class="header">
             ${invoiceSettings.showLogo && store.logoUrl ? `<img src="${store.logoUrl}" style="height: 50px; margin-bottom: 10px;" />` : ''}
             <div class="store-name">${store.name || 'Store Name'}</div>
-            ${invoiceSettings.showStoreAddress ? `<div class="store-detail">${getAddressStr(store.address)}</div>` : ''}
+            ${invoiceSettings.showStoreAddress !== false ? `<div class="store-detail">${getAddressStr(store.address)}</div>` : ''}
             ${store.contact ? `<div class="store-detail">Phone: ${store.contact}</div>` : ''}
             ${store.email ? `<div class="store-detail">Email: ${store.email}</div>` : ''}
             ${store.gstin ? `<div class="store-detail" style="font-weight: 500; margin-top:4px;">GSTIN: ${store.gstin}</div>` : ''}
@@ -94,7 +106,11 @@ export const printReceipt = (invoice, format = '80mm', settings = {}) => {
     `;
 
     const generateCustomerMeta = () => {
-        const custName = invoice.customerName || invoice.customer || 'Walk-in Customer';
+        // Handle both object and string name
+        const custName = invoice.customerName ||
+            (invoice.customer ? (invoice.customer.name || invoice.customer.fullName) : null) ||
+            'Walk-in Customer';
+
         return `
         <div class="meta-grid">
             <div class="meta-col">
@@ -103,8 +119,8 @@ export const printReceipt = (invoice, format = '80mm', settings = {}) => {
                 ${invoiceSettings.showCustomerGstin && invoice.customerGstin ? `<div><span class="meta-label">GSTIN:</span> ${invoice.customerGstin}</div>` : ''}
             </div>
             <div class="meta-col text-right">
-                <div><span class="meta-label">Invoice No:</span> <span class="meta-val">#${invoice.id}</span></div>
-                <div><span class="meta-label">Date:</span> <span>${new Date(invoice.date).toLocaleDateString()}</span></div>
+                <div><span class="meta-label">Invoice No:</span> <span class="meta-val">#${invoice.invoiceNumber || invoice.id || invoice._id || 'N/A'}</span></div>
+                <div><span class="meta-label">Date:</span> <span>${new Date(invoice.date || Date.now()).toLocaleDateString()}</span></div>
             </div>
         </div>
         `;
@@ -118,12 +134,11 @@ export const printReceipt = (invoice, format = '80mm', settings = {}) => {
                     ${invoiceSettings.showHsn ? '<th>HSN</th>' : ''}
                     <th class="text-center">Qty</th>
                     <th class="text-right">Price</th>
-                    ${invoiceSettings.showTaxBreakup ? '<th class="text-right">Tax</th>' : ''}
                     <th class="text-right">Amount</th>
                 </tr>
             </thead>
             <tbody>
-                ${invoice.items.map(item => `
+                ${(invoice.items || []).map(item => `
                     <tr>
                         <td>
                             <div style="font-weight: 500">${item.name}</div>
@@ -131,9 +146,8 @@ export const printReceipt = (invoice, format = '80mm', settings = {}) => {
                         </td>
                         ${invoiceSettings.showHsn ? `<td>${item.hsnCode || '-'}</td>` : ''}
                         <td class="text-center">${item.quantity}</td>
-                        <td class="text-right">${(item.price || 0).toFixed(2)}</td>
-                         ${invoiceSettings.showTaxBreakup ? `<td class="text-right" style="font-size:0.85em; color:#666;">${item.taxRate || 0}%</td>` : ''}
-                        <td class="text-right">${(item.total || 0).toFixed(2)}</td>
+                        <td class="text-right">${formatCurrency(item.price || item.sellingPrice || 0).replace('₹', '')}</td>
+                        <td class="text-right">${formatCurrency(item.total).replace('₹', '')}</td>
                     </tr>
                 `).join('')}
             </tbody>
@@ -159,7 +173,7 @@ export const printReceipt = (invoice, format = '80mm', settings = {}) => {
     const generateFooter = () => `
         ${invoiceSettings.showTerms ? `<div class="terms"><strong>Terms & Conditions:</strong><br/>${invoiceSettings.termsAndConditions || 'No returns.'}</div>` : ''}
         <div class="footer">
-            <div>${invoiceSettings.footerNote || 'Thank you!'}</div>
+            <div>${store.footer || invoiceSettings.footerNote || 'Thank you!'}</div>
             <div style="font-size: 0.8em; margin-top: 4px;">System Generated Invoice</div>
         </div>
     `;
@@ -197,9 +211,6 @@ export const printReceipt = (invoice, format = '80mm', settings = {}) => {
     printWindow.document.write(html);
     printWindow.document.close();
     printWindow.focus();
-    // setTimeout(() => printWindow.print(), 500); 
-    // Commented out auto-print to allow users to see the preview first as per "Test Preview" button logic often requested. 
-    // Actually for "auto-print after sale" requirement, we might want it back, but let's stick to click-to-print for reliability in browser.
 };
 
 export default printReceipt;

@@ -1,7 +1,10 @@
 const { app, BrowserWindow } = require("electron");
 const path = require("path");
+const { initDatabase } = require("../storage/local/database");
+const { registerHandlers } = require("./ipcHandlers");
 
 // ✅ START BACKEND FIRST (CRITICAL)
+// For now, we still start the backend, but the UI should prefer IPC if available
 require("./start-backend");
 
 let mainWindow;
@@ -53,6 +56,7 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
+      nodeIntegration: false // Ensure security
     },
   });
 
@@ -61,4 +65,13 @@ function createWindow() {
   );
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  // Initialize DB
+  const userDataPath = app.getPath('userData');
+  initDatabase(userDataPath);
+
+  // Register IPC Handlers
+  registerHandlers();
+
+  createWindow();
+});
