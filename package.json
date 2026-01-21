@@ -39,36 +39,49 @@
     "wait-on": "^9.0.3"
   },
   "build": {
-    "appId": "com.yourcompany.billing",
-    "productName": "Billing Software",
-    "asar": true,
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "electron/**/*",
-      "backend/**/*",
-      "frontend/dist/**/*",
-      "node_modules/**/*",
-      "package.json"
-    ],
-    "extraResources": [
-      {
-        "from": "backend/.env",
-        "to": "backend/.env"
-      }
-    ],
-    "protocols": [
-      {
-        "name": "Billing App",
-        "schemes": [
-          "billing"
-        ]
-      }
-    ],
-    "win": {
-      "target": "nsis",
-      "icon": "electron/icon.ico"
+  "appId": "com.yourcompany.billing",
+  "productName": "Billing Software",
+
+  "asar": true,
+  "npmRebuild": true,
+
+  "directories": {
+    "output": "release"
+  },
+
+  "files": [
+    "electron/**/*",
+    "backend/**/*",
+    "frontend/dist/**/*",
+    "node_modules/**/*",
+    "package.json"
+  ],
+
+  "extraResources": [
+    {
+      "from": "backend/.env",
+      "to": "backend/.env"
     }
+  ],
+
+  "protocols": [
+    {
+      "name": "Billing App",
+      "schemes": ["billing"]
+    }
+  ],
+
+  "win": {
+    "target": "nsis",
+    "icon": "electron/icon.ico"
+  },
+
+  "linux": {
+    "target": ["AppImage", "deb"],
+    "icon": "electron/icons",
+    "category": "Office"
   }
+}
+
+
 }

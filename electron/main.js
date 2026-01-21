@@ -50,6 +50,7 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
+    title: "Billing software",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -59,6 +60,8 @@ function createWindow() {
   mainWindow.loadFile(
     path.join(__dirname, "../frontend/dist/index.html")
   );
+      mainWindow.on("page-title-updated", (e) => e.preventDefault());
+      mainWindow.setTitle("Billing Software");
 }
 
 app.whenReady().then(createWindow);
