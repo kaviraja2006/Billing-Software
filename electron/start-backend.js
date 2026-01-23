@@ -1,7 +1,14 @@
+const { spawn } = require("child_process");
 const path = require("path");
 
-require("dotenv").config({
-  path: path.join(__dirname, "../backend/.env")
+const backendPath = path.join(__dirname, "..", "backend", "server.js");
+
+const backend = spawn("node", [backendPath], {
+  stdio: "inherit",
+  env: {
+    ...process.env,
+    PORT: process.env.PORT || 5000,
+  }
 });
 
-require("../backend/server");
+module.exports = backend;

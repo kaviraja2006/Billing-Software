@@ -5,30 +5,29 @@ import { Card } from "../../components/ui/Card";
 import { Lock, AlertCircle } from "lucide-react";
 
 const LoginPage = () => {
-  const { authStatus } = useAuth();
+  const { authStatus, loginWithGoogle, setTokenAndAuthenticate } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-
   const [error, setError] = useState("");
 
   const from = location.state?.from?.pathname || "/";
 
-  // ✅ Redirect ONLY after backend OAuth completes
+  // ✅ Redirect AFTER auth succeeds
   useEffect(() => {
     if (authStatus === "authenticated") {
       navigate(from, { replace: true });
     }
   }, [authStatus, from, navigate]);
 
-  // ✅ Start Google login via backend + system browser
-  const handleGoogleLogin = () => {
-    try {
-      window.open("http://localhost:5000/auth/google");
-    } catch (err) {
-      console.error(err);
-      setError("Unable to open browser for Google login.");
+  // ✅ Listen for Electron Google Auth Token
+  useEffect(() => {
+    if (window.electron) {
+      window.electron.onGoogleAuthSuccess((token) => {
+        console.log("✅ Received token from Electron, authenticating...");
+        setTokenAndAuthenticate(token); // ✅ Use context method instead of reload
+      });
     }
-  };
+  }, [setTokenAndAuthenticate]);
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
@@ -51,7 +50,13 @@ const LoginPage = () => {
         )}
 
         <button
-          onClick={handleGoogleLogin}
+          onClick={() => {
+            try {
+              loginWithGoogle();
+            } catch {
+              setError("Unable to start Google login.");
+            }
+          }}
           className="w-full h-10 rounded-md bg-blue-600 text-white font-medium hover:bg-blue-700 transition"
         >
           Sign in with Google

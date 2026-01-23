@@ -304,23 +304,23 @@ const InvoicesPage = () => {
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-slate-900">Invoices</h1>
-                    <div className="flex items-center gap-2 mt-1">
-                        <span className="text-sm font-medium text-slate-500 px-2 py-0.5 bg-slate-100 rounded-md border border-slate-200">
+                    <h1 className="text-2xl md:text-3xl font-bold text-slate-900">Invoices</h1>
+                    <div className="flex flex-wrap items-center gap-2 mt-1">
+                        <span className="text-xs sm:text-sm font-medium text-slate-500 px-2 py-0.5 bg-slate-100 rounded-md border border-slate-200">
                             Total: {stats.summary.totalInvoices}
                         </span>
-                        <span className="text-sm font-medium text-emerald-600 px-2 py-0.5 bg-emerald-50 rounded-md border border-emerald-100">
+                        <span className="text-xs sm:text-sm font-medium text-emerald-600 px-2 py-0.5 bg-emerald-50 rounded-md border border-emerald-100">
                             Sales: ₹{stats.summary.totalSales.toFixed(0)}
                         </span>
-                        <span className="text-sm font-medium text-amber-600 px-2 py-0.5 bg-amber-50 rounded-md border border-amber-100">
+                        <span className="text-xs sm:text-sm font-medium text-amber-600 px-2 py-0.5 bg-amber-50 rounded-md border border-amber-100">
                             Due: ₹{stats.summary.outstandingAmount.toFixed(0)}
                         </span>
                     </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2 w-full md:w-auto">
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="outline">
+                            <Button variant="outline" className="w-full sm:w-auto">
                                 <Columns className="mr-2 h-4 w-4" /> Columns
                             </Button>
                         </DropdownMenuTrigger>
@@ -338,7 +338,7 @@ const InvoicesPage = () => {
                             ))}
                         </DropdownMenuContent>
                     </DropdownMenu>
-                    <Button variant="outline" onClick={handleExport}>
+                    <Button variant="outline" onClick={handleExport} className="w-full sm:w-auto">
                         <Download className="mr-2 h-4 w-4" /> Export
                     </Button>
                 </div>
@@ -716,7 +716,7 @@ const InvoicesPage = () => {
 
             {/* Side Panel (Enhanced) */}
             {selectedInvoice && (
-                <div className="w-full md:w-1/3 bg-white border-l border-slate-200 h-full overflow-y-auto fixed right-0 top-0 z-50 shadow-2xl p-6 transition-transform transform translate-x-0 pt-20">
+                <div className="w-full md:w-1/2 lg:w-1/3 bg-white border-l border-slate-200 h-full overflow-y-auto fixed right-0 top-0 z-50 shadow-2xl p-4 sm:p-6 transition-transform transform translate-x-0 pt-16 md:pt-20">
                     <div className="flex justify-between items-start mb-6">
                         <div>
                             <h2 className="text-xl font-bold text-slate-900">

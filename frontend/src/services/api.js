@@ -12,12 +12,12 @@ const api = axios.create({
     withCredentials: true
 });
 
-// Request interceptor to attach token
+// Request interceptor to add JWT token
 api.interceptors.request.use(
     (config) => {
         const token = localStorage.getItem('token');
         if (token) {
-            config.headers['Authorization'] = `Bearer ${token}`;
+            config.headers.Authorization = `Bearer ${token}`;
         }
         return config;
     },
@@ -28,43 +28,24 @@ api.interceptors.request.use(
 api.interceptors.response.use(
     (response) => response,
     (error) => {
-        // Handle network errors (server not running, connection refused, etc.)
-        if (!error.response) {
-            console.error('Network error: Backend server may not be reachable (CORS, server down, or invalid URL).');
-        } else {
-            // Log detailed API error for debugging
-            console.error('API Error:', error.response.status, error.response.data);
+        if (error.response?.status === 401) {
+            // Clear invalid token
+            localStorage.removeItem('token');
+            return Promise.reject(error);
         }
-
-        if (error.response && error.response.status === 401) {
-            // Only redirect if not already on login page
-            if (!window.location.pathname.includes('/login')) {
-                localStorage.removeItem('token');
-                localStorage.removeItem('user');
-                window.location.href = '/login';
-            }
-        }
+        console.error("API error:", error);
         return Promise.reject(error);
     }
 );
 
+
+
+
 // Service Wrapper
 const services = {
     auth: {
-        login: async (credentials) => {
-            const response = await api.post('/auth/login', credentials);
-            return response.data;
-        },
-        googleLogin: async (token) => {
-            const response = await api.post('/auth/google', { token });
-            return response.data;
-        },
-        register: async (userData) => {
-            const response = await api.post('/auth/register', userData);
-            return response.data;
-        },
-        logout: () => api.post('/auth/logout'),
         getCurrentUser: () => api.get('/auth/me'),
+        logout: () => api.post('/auth/logout'),
     },
     customers: {
         getAll: () => api.get('/customers'),

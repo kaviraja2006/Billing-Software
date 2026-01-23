@@ -5,9 +5,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Search, UserPlus, Filter, Eye, Phone, Mail, Trash2, X, Users, TrendingUp, AlertCircle, Award } from 'lucide-react';
 import CustomerDrawer from './CustomerDrawer';
 import { useCustomers } from '../../context/CustomerContext';
+import { useToast } from '../../context/ToastContext';
 
 const CustomersPage = () => {
     const { customers, addCustomer, updateCustomer, deleteCustomer, loading } = useCustomers();
+    const toast = useToast();
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const [selectedCustomer, setSelectedCustomer] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
@@ -242,8 +244,8 @@ const CustomersPage = () => {
                                             key={type}
                                             onClick={() => toggleFilter('customerType', type)}
                                             className={`w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${filters.customerType === type
-                                                    ? 'bg-blue-600 text-white shadow-md'
-                                                    : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+                                                ? 'bg-blue-600 text-white shadow-md'
+                                                : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
                                                 }`}
                                         >
                                             {type}
@@ -261,10 +263,10 @@ const CustomersPage = () => {
                                             key={tag}
                                             onClick={() => toggleFilter('tags', tag)}
                                             className={`w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${filters.tags.includes(tag) ?
-                                                    tag === 'VIP' ? 'bg-purple-600 text-white shadow-md' :
-                                                        tag === 'Wholesale' ? 'bg-blue-600 text-white shadow-md' :
-                                                            'bg-orange-600 text-white shadow-md'
-                                                    : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+                                                tag === 'VIP' ? 'bg-purple-600 text-white shadow-md' :
+                                                    tag === 'Wholesale' ? 'bg-blue-600 text-white shadow-md' :
+                                                        'bg-orange-600 text-white shadow-md'
+                                                : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
                                                 }`}
                                         >
                                             {tag}
@@ -282,8 +284,8 @@ const CustomersPage = () => {
                                             key={source}
                                             onClick={() => toggleFilter('source', source)}
                                             className={`w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${filters.source === source
-                                                    ? 'bg-blue-600 text-white shadow-md'
-                                                    : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+                                                ? 'bg-blue-600 text-white shadow-md'
+                                                : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
                                                 }`}
                                         >
                                             {source}
@@ -333,7 +335,7 @@ const CustomersPage = () => {
                                                 {customer.customerType}
                                             </span>
                                         )}
-                                        {customer.tags?.map(tag => (
+                                        {Array.isArray(customer.tags) && customer.tags.map(tag => (
                                             <span key={tag} className={`px-2.5 py-1 rounded-full text-xs font-medium border ${getTagBadge(tag)}`}>
                                                 {tag}
                                             </span>

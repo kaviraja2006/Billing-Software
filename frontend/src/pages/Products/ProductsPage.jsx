@@ -219,9 +219,9 @@ const ProductsPage = () => {
                     {/* Header & Stats */}
                     <div className="space-y-6">
                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Products & Inventory</h1>
+                            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Products & Inventory</h1>
 
-                            <div className="flex items-center gap-3">
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
                                 {/* Import Button */}
                                 <div className="relative">
                                     <input
@@ -231,7 +231,7 @@ const ProductsPage = () => {
                                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                         title="Import Products from Excel"
                                     />
-                                    <Button variant="outline" className="bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-sm">
+                                    <Button variant="outline" className="bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-sm w-full sm:w-auto">
                                         <Upload className="mr-2 h-4 w-4" /> Import
                                     </Button>
                                 </div>
@@ -246,16 +246,17 @@ const ProductsPage = () => {
                                             handleToggleSelectionMode(); // Toggle mode otherwise
                                         }
                                     }}
-                                    className={`shadow-sm transition-all ${isSelectionMode ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-600'}`}
+                                    className={`shadow-sm transition-all w-full sm:w-auto ${isSelectionMode ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-600'}`}
                                 >
                                     {isSelectionMode ? (selectedRows.size > 0 ? <Download className="mr-2 h-4 w-4" /> : <ListChecks className="mr-2 h-4 w-4" />) : <ListChecks className="mr-2 h-4 w-4" />}
-                                    {isSelectionMode ? (selectedRows.size > 0 ? `Export (${selectedRows.size})` : 'Done Selecting') : 'Select / Export'}
+                                    <span className="hidden sm:inline">{isSelectionMode ? (selectedRows.size > 0 ? `Export (${selectedRows.size})` : 'Done Selecting') : 'Select / Export'}</span>
+                                    <span className="sm:hidden">{isSelectionMode ? (selectedRows.size > 0 ? `Export (${selectedRows.size})` : 'Done') : 'Select'}</span>
                                 </Button>
 
                                 {/* Professional Add Product Button */}
                                 <Button
                                     onClick={handleAddNew}
-                                    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5"
+                                    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5 w-full sm:w-auto"
                                 >
                                     <Plus className="mr-2 h-4 w-4" /> Add Product
                                 </Button>

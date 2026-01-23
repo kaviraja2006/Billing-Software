@@ -204,16 +204,16 @@ const ExpensesPage = () => {
     return (
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <h1 className="text-2xl font-bold text-slate-900">Expenses</h1>
-                <div className="flex gap-2">
+                <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Expenses</h1>
+                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                     <Button
                         onClick={handleExportAll}
                         variant="outline"
-                        className="border-slate-300"
+                        className="border-slate-300 w-full sm:w-auto"
                     >
                         <Download className="mr-2 h-4 w-4" /> Export All
                     </Button>
-                    <Button onClick={() => setIsModalOpen(true)} className="bg-red-600 hover:bg-red-700">
+                    <Button onClick={() => setIsModalOpen(true)} className="bg-red-600 hover:bg-red-700 w-full sm:w-auto">
                         <Plus className="mr-2 h-4 w-4" /> Add Expense
                     </Button>
                 </div>
@@ -230,7 +230,7 @@ const ExpensesPage = () => {
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                     <DateRangePicker
                         value={dateRange}
                         onDateRangeChange={setDateRange}

@@ -441,43 +441,45 @@ const SettingsPage = () => {
     return (
         <div className="min-h-screen bg-slate-50/50 pb-20">
             {/* Header */}
-            <div className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200 px-6 py-4 flex justify-between items-center">
+            <div className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200 px-4 sm:px-6 py-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                 <div className="flex items-center gap-3">
-                    <h1 className="text-2xl font-bold text-slate-900">Settings</h1>
+                    <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Settings</h1>
                     {unsavedChanges && (
                         <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 animate-pulse">
                             Unsaved Changes
                         </Badge>
                     )}
                 </div>
-                <div className="flex gap-2">
-                    <Button variant="ghost" onClick={() => window.location.reload()}><RotateCcw className="h-4 w-4 mr-2" /> Reset</Button>
-                    <Button onClick={handleSave} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-200">
+                <div className="flex gap-2 w-full sm:w-auto">
+                    <Button variant="ghost" onClick={() => window.location.reload()} className="flex-1 sm:flex-none"><RotateCcw className="h-4 w-4 mr-2" /> Reset</Button>
+                    <Button onClick={handleSave} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-200 flex-1 sm:flex-none">
                         <Save className="h-4 w-4 mr-2" /> Save Changes
                     </Button>
                 </div>
             </div>
 
-            <div className="flex max-w-7xl mx-auto pt-8 px-6 gap-8">
+            <div className="flex flex-col lg:flex-row max-w-7xl mx-auto pt-8 px-4 sm:px-6 gap-8">
                 {/* Sidebar Navigation */}
-                <div className="w-64 flex-shrink-0 space-y-2">
-                    {tabs.map(tab => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id)}
-                            className={`
-                                w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all
-                                ${activeTab === tab.id
-                                    ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200'
-                                    : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-900'}
-                            `}
-                        >
-                            <tab.icon size={18} />
-                            {tab.label}
-                        </button>
-                    ))}
+                <div className="w-full lg:w-64 flex-shrink-0">
+                    <div className="flex flex-row lg:flex-col gap-2 overflow-x-auto lg:overflow-visible pb-2 lg:pb-0">
+                        {tabs.map(tab => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`
+                                    flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all whitespace-nowrap
+                                    ${activeTab === tab.id
+                                        ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200'
+                                        : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-900'}
+                                `}
+                            >
+                                <tab.icon size={18} />
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
 
-                    <div className="pt-8 px-4">
+                    <div className="hidden lg:block pt-8 px-4">
                         <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">System</p>
                         <p className="text-xs text-slate-400">Version 2.4.0 (Build 2024.1)</p>
                         <p className="text-xs text-slate-400 mt-1">Last Updated: {settings.lastUpdatedAt ? new Date(settings.lastUpdatedAt).toLocaleDateString() : 'Never'}</p>

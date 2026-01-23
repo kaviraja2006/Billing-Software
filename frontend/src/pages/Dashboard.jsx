@@ -214,19 +214,19 @@ const Dashboard = () => {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Zilling Dashboard</h1>
+                    <h1 className="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight">Zilling Dashboard</h1>
                     <p className="text-slate-500 text-sm mt-1">Overview of your store's performance</p>
                 </div>
 
-                <div className="flex flex-wrap gap-3 items-center">
+                <div className="flex flex-col sm:flex-row flex-wrap gap-3 items-stretch sm:items-center w-full md:w-auto">
                     {/* Date Filters */}
-                    <div className="bg-white p-1 rounded-lg border shadow-sm flex items-center">
+                    <div className="bg-white p-1 rounded-lg border shadow-sm flex items-center overflow-x-auto">
                         {['today', 'week', 'month', 'all'].map((range) => (
                             <button
                                 key={range}
                                 onClick={() => setDateRange(range)}
                                 className={cn(
-                                    "px-3 py-1.5 text-sm font-medium rounded-md transition-all capitalize",
+                                    "px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-all capitalize whitespace-nowrap flex-shrink-0",
                                     dateRange === range ? "bg-primary-main text-white shadow-sm" : "text-slate-600 hover:bg-slate-50"
                                 )}
                             >
@@ -236,16 +236,16 @@ const Dashboard = () => {
                     </div>
 
                     {dateRange === 'custom' && (
-                        <div className="flex gap-2 animate-in slide-in-from-right-5 fade-in">
+                        <div className="flex flex-col sm:flex-row gap-2 animate-in slide-in-from-right-5 fade-in w-full sm:w-auto">
                             <Input
                                 type="date"
-                                className="w-36 h-9"
+                                className="w-full sm:w-36 h-9 text-sm"
                                 value={customStart}
                                 onChange={e => setCustomStart(e.target.value)}
                             />
                             <Input
                                 type="date"
-                                className="w-36 h-9"
+                                className="w-full sm:w-36 h-9 text-sm"
                                 value={customEnd}
                                 onChange={e => setCustomEnd(e.target.value)}
                             />
@@ -254,10 +254,10 @@ const Dashboard = () => {
 
                     <div className="h-6 w-px bg-slate-200 mx-1 hidden md:block"></div>
 
-                    <Button onClick={() => navigate('/expenses')} variant="outline" className="bg-white shadow-sm">
-                        <ArrowDownRight className="mr-2 h-4 w-4 text-amber-600" /> Add Expense
+                    <Button onClick={() => navigate('/expenses')} variant="outline" className="bg-white shadow-sm w-full sm:w-auto">
+                        <ArrowDownRight className="mr-2 h-4 w-4 text-amber-600" /> <span className="hidden sm:inline">Add </span>Expense
                     </Button>
-                    <Button onClick={() => navigate('/billing')} className="bg-primary-main hover:bg-primary-hover shadow-md text-white">
+                    <Button onClick={() => navigate('/billing')} className="bg-primary-main hover:bg-primary-hover shadow-md text-white w-full sm:w-auto">
                         <ShoppingCart className="mr-2 h-4 w-4" /> New Sale <span className="ml-2 opacity-70 text-xs hidden lg:inline">Alt+N</span>
                     </Button>
                 </div>
@@ -423,15 +423,15 @@ const Dashboard = () => {
 
             {/* Recent Transactions with Filters */}
             <Card className="shadow-md border-none">
-                <CardHeader className="flex flex-row items-center justify-between">
+                <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
                     <div>
                         <CardTitle>Recent Transactions</CardTitle>
                         <CardDescription>Latest billing activity</CardDescription>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
                         <Filter className="h-4 w-4 text-slate-400" />
                         <select
-                            className="text-sm border-none bg-slate-50 rounded-md p-1 focus:ring-0 text-slate-600 font-medium cursor-pointer hover:bg-slate-100"
+                            className="text-sm border-none bg-slate-50 rounded-md p-1 focus:ring-0 text-slate-600 font-medium cursor-pointer hover:bg-slate-100 flex-1 sm:flex-none"
                             value={paymentFilter}
                             onChange={(e) => setPaymentFilter(e.target.value)}
                         >

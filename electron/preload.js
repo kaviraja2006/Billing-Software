@@ -1,7 +1,6 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
-contextBridge.exposeInMainWorld("electronAuth", {
-  onToken: (callback) => {
-    ipcRenderer.on("auth-token", (_, token) => callback(token));
-  },
+contextBridge.exposeInMainWorld("electron", {
+    onGoogleAuthSuccess: (callback) =>
+        ipcRenderer.on("google-auth-success", (event, token) => callback(token)),
 });

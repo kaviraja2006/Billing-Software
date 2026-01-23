@@ -4,6 +4,7 @@ import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { ShoppingBag, Calendar, Check, AlertCircle, X } from 'lucide-react';
 import services from '../../services/api';
+import { useToast } from '../../context/ToastContext';
 
 // Indian States
 const INDIAN_STATES = [
@@ -38,6 +39,7 @@ const useDebounce = (value, delay) => {
 
 const CustomerDrawer = ({ isOpen, onClose, customer, onSave }) => {
     const title = customer ? 'Customer Details' : 'Add New Customer';
+    const toast = useToast();
     const [activeTab, setActiveTab] = useState('details');
     const [formData, setFormData] = useState({
         fullName: '',
@@ -221,12 +223,12 @@ const CustomerDrawer = ({ isOpen, onClose, customer, onSave }) => {
     const handleSave = (addAnother = false) => {
         // Validate required fields
         if (!formData.fullName || !formData.phone) {
-            alert("Name and Phone are required");
+            toast.warning("Name and Phone are required");
             return;
         }
 
         if (formData.customerType === 'Business' && !formData.gstin) {
-            alert("GSTIN is required for business customers");
+            toast.warning("GSTIN is required for business customers");
             return;
         }
 
@@ -409,6 +411,7 @@ const CustomerDrawer = ({ isOpen, onClose, customer, onSave }) => {
                                                 value={formData.phone}
                                                 onChange={handleChange}
                                                 placeholder="+91 98765 43210"
+                                                maxLength={10}
                                                 className={touched.phone && validation.phone && !validation.phone.valid ? 'border-red-300' : ''}
                                             />
                                             <div className="absolute right-3 top-3">
@@ -584,10 +587,10 @@ const CustomerDrawer = ({ isOpen, onClose, customer, onSave }) => {
                                                 type="button"
                                                 onClick={() => handleTagToggle(tag)}
                                                 className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${formData.tags.includes(tag)
-                                                        ? tag === 'VIP' ? 'bg-purple-600 text-white'
-                                                            : tag === 'Wholesale' ? 'bg-blue-600 text-white'
-                                                                : 'bg-orange-600 text-white'
-                                                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                                                    ? tag === 'VIP' ? 'bg-purple-600 text-white'
+                                                        : tag === 'Wholesale' ? 'bg-blue-600 text-white'
+                                                            : 'bg-orange-600 text-white'
+                                                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                                                     }`}
                                             >
                                                 {formData.tags.includes(tag) && <Check size={12} className="inline mr-1" />}

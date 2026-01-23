@@ -15,59 +15,52 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [authStatus, setAuthStatus] = useState("loading");
 
-  // 1️⃣ Initial auth check
+  // ✅ Check auth state on app load
   useEffect(() => {
-    const init = async () => {
-      const token = localStorage.getItem("token");
-
-      if (!token) {
-        setAuthStatus("unauthenticated");
-        return;
-      }
-
+    const checkAuth = async () => {
       try {
         const res = await services.auth.getCurrentUser();
-        setUser(res.data);
+        setUser(res.data); // ✅ Fixed: /auth/me returns user data directly, not res.data.user
         setAuthStatus("authenticated");
       } catch (err) {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
+        if (err.response?.status !== 401) {
+          console.error("Auth check failed", err);
+        }
         setUser(null);
         setAuthStatus("unauthenticated");
       }
     };
-
-    init();
+    checkAuth();
   }, []);
 
-  // 2️⃣ Receive token from Electron
-  useEffect(() => {
-    if (!window.electronAuth) return;
 
-    window.electronAuth.onToken(async (token) => {
-      try {
-        localStorage.setItem("token", token);
-        const res = await services.auth.getCurrentUser();
-        setUser(res.data);
-        setAuthStatus("authenticated");
-      } catch (err) {
-        console.error("Auth failed:", err);
-        setUser(null);
-        setAuthStatus("unauthenticated");
-      }
-    });
-  }, []);
+  // ✅ Start Google OAuth (backend handles everything)
+  const loginWithGoogle = () => {
+    window.open("http://localhost:5000/auth/google", "_blank");
+  };
 
-  // 3️⃣ Logout (Electron-safe)
+
+  // ✅ Logout (backend-side)
   const logout = async () => {
     try {
       await services.auth.logout();
-    } catch (error) {
-      console.error("Logout error", error);
     } finally {
+      localStorage.removeItem("token"); // ✅ Clear token from localStorage
       setUser(null);
+      setAuthStatus("unauthenticated");
+    }
+  };
+
+  // ✅ Set token and authenticate (for Electron OAuth callback)
+  const setTokenAndAuthenticate = async (token) => {
+    localStorage.setItem("token", token);
+    try {
+      const res = await services.auth.getCurrentUser();
+      setUser(res.data);
+      setAuthStatus("authenticated");
+    } catch (err) {
+      console.error("Failed to authenticate with token:", err);
       localStorage.removeItem("token");
-      localStorage.removeItem("user");
       setAuthStatus("unauthenticated");
     }
   };
@@ -77,7 +70,10 @@ export const AuthProvider = ({ children }) => {
       value={{
         user,
         authStatus,
-        logout, // ✅ THIS WAS MISSING
+        isAuthenticated: authStatus === "authenticated",
+        loginWithGoogle,
+        logout,
+        setTokenAndAuthenticate, // ✅ Expose new method
       }}
     >
       {children}
