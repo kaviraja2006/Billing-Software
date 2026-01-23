@@ -65,15 +65,29 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // 4️⃣ Direct Login Helper (for OAuth / Instant Access)
+  const loginSuccess = (token, userData) => {
+    localStorage.setItem("token", token);
+    if (userData) {
+      localStorage.setItem("user", JSON.stringify(userData));
+      setUser(userData);
+    }
+    setAuthStatus("authenticated");
+    // If we don't have userData yet, we can trigger a fetch
+    if (!userData) {
+      services.auth.getCurrentUser()
+        .then(res => setUser(res.data))
+        .catch(console.error);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
         user,
         authStatus,
-        isAuthenticated: authStatus === "authenticated",
-        loginWithGoogle,
         logout,
-        setTokenAndAuthenticate, // ✅ Expose new method
+        loginSuccess, // ✅ EXPOSED
       }}
     >
       {children}

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Modal } from '../../components/ui/Modal';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/Table';
 import { Button } from '../../components/ui/Button';
-import { printReceipt } from '../../utils/printReceipt';
+import { printReceipt } from '../../utils/printerService';
 import { Printer, Loader2 } from 'lucide-react';
 import services from '../../services/api';
 

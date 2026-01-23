@@ -9,7 +9,7 @@ import { Modal } from '../../components/ui/Modal';
 import { useTransactions } from '../../context/TransactionContext';
 import { useCustomers } from '../../context/CustomerContext';
 import { useProducts } from '../../context/ProductContext';
-import { printReceipt } from '../../utils/printReceipt';
+import { printReceipt } from '../../utils/printerService';
 
 const PaymentStep = ({ billingData, onComplete }) => {
     const { addTransaction } = useTransactions();

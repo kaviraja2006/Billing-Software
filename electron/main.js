@@ -1,5 +1,11 @@
 const { app, BrowserWindow,Menu } = require("electron");
 const path = require("path");
+const { initDatabase } = require("../storage/local/database");
+const { registerHandlers } = require("./ipcHandlers");
+
+// ✅ START BACKEND FIRST (CRITICAL)
+// For now, we still start the backend, but the UI should prefer IPC if available
+require("./start-backend");
 
 let mainWindow;
 let backendProcess;
@@ -68,13 +74,16 @@ if (!gotTheLock) {
   });
 }
 
-function handleDeepLink(url) {
-  // billing://auth?token=...
-  console.log("Deep link received:", url);
-  try {
-    const urlObj = new URL(url);
-    const params = new URLSearchParams(urlObj.search);
-    const token = params.get("token");
+function createWindow() {
+  mainWindow = new BrowserWindow({
+    width: 1400,
+    height: 900,
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false // Ensure security
+    },
+  });
 
     if (token && mainWindow) {
       console.log("Sending token to renderer");
@@ -85,13 +94,13 @@ function handleDeepLink(url) {
   }
 }
 
-// Quit properly
-app.on("window-all-closed", () => {
-  if (backendProcess) {
-    backendProcess.kill();
-  }
-  if (process.platform !== "darwin") {
-    app.quit();
-  }
-});
+app.whenReady().then(() => {
+  // Initialize DB
+  const userDataPath = app.getPath('userData');
+  initDatabase(userDataPath);
 
+  // Register IPC Handlers
+  registerHandlers();
+
+  createWindow();
+});

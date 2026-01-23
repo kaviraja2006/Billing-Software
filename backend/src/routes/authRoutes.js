@@ -28,16 +28,35 @@ router.get(
         return res.redirect("/auth/google/failure?reason=no_user");
       }
 
-      // ✅ CREATE JWT
-      const token = generateToken({
-        email: user.email,
-        googleSub: user.googleSub,
-      });
+    // Check User-Agent to determine environment
+    // Electron apps typically append 'Electron/...' to the UA string
+    // Check for 'state' query param to determine redirect target
+    // Passport google strategy usually handles state, but we can also just check req.query.state if we passed it manually in the first call?
+    // Actually, getting state back from Google requires enabling it in the initial call.
 
-      console.log("✅ Auth Success, Redirecting to billing:// with token");
-      // ✅ REDIRECT BACK TO ELECTRON
-      return res.redirect(`billing://auth?token=${token}`);
-    })(req, res, next);
+    // Simpler approach for now: Check if the request origin/referrer implies web? 
+    // Or we can rely on a cookie set before the auth request?
+
+    // Let's use a simple query param on the CALLBACK itself? No, Google calls the callback.
+    // We need to pass 'state' to Google.
+
+    // For now, let's just support both by defaulting to Web if we can't tell, or checking specifically.
+    // Actually, Electron user agent might be distinct?
+
+    const userAgent = req.headers['user-agent'] || '';
+    const isElectron = userAgent.includes('Electron');
+
+    if (isElectron) {
+      // Redirect back to Electron via custom protocol
+      res.redirect(`billing://auth?token=${token}`);
+    } else {
+      // Default to Web
+      // Assuming Vite dev server port 5173 or production URL
+      // Better to set this in ENV, but hardcoded for now matches user context
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      // FIX: Use HashRouter syntax /#/
+      res.redirect(`${frontendUrl}/#/oauth-success?token=${token}`);
+    }
   }
 );
 

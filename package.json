@@ -8,6 +8,7 @@
   "main": "electron/main.js",
   "scripts": {
     "electron": "electron .",
+    "dev:web": "concurrently \"cd backend && npm start\" \"cd frontend && npm run dev\"",
     "build:frontend": "cd frontend && npm run build",
     "dist": "npm run build:frontend && electron-builder"
   },
@@ -20,7 +21,7 @@
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
     "express-async-handler": "^1.2.0",
-    "express-session": "^1.18.2",
+    "fs-extra": "^11.3.3",
     "google-auth-library": "^10.5.0",
     "helmet": "^8.1.0",
     "joi": "^18.0.2",

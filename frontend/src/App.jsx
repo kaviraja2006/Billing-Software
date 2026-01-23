@@ -14,6 +14,7 @@ import BarcodeGenerator from './pages/Barcode/BarcodePage';
 
 import LoginPage from './pages/Auth/LoginPage';
 import SignupPage from './pages/Auth/SignupPage';
+import OAuthCallback from './pages/Auth/OAuthCallback';
 import ProtectedRoute from './components/layout/ProtectedRoute';
 import { AuthProvider } from './context/AuthContext';
 import { CustomerProvider } from './context/CustomerContext';
@@ -35,6 +36,7 @@ function App() {
                   <Routes>
                     <Route path="/login" element={<LoginPage />} />
                     <Route path="/signup" element={<SignupPage />} />
+                    <Route path="/oauth-success" element={<OAuthCallback />} />
 
                     <Route path="/" element={
                       <ProtectedRoute>
