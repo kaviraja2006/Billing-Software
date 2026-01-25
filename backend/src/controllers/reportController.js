@@ -1,439 +1,308 @@
-const asyncHandler = require('express-async-handler');
-const Invoice = require('../models/invoiceModel');
-const Expense = require('../models/expenseModel');
-const Customer = require('../models/customerModel');
-const Product = require('../models/productModel');
-const mongoose = require('mongoose');
+const { withDB } = require("../db/db");
+const { exportReport } = require("../db/exportReport");
+/**
+ * Dashboard summary
+ */
+exports.getDashboardStats = async (req, res) => {
+  const db = await withDB(req);
+  const { startDate, endDate } = req.query;
 
-// Helper to build date match
-const buildDateMatch = (userId, startDate, endDate) => {
-    const match = { userId: new mongoose.Types.ObjectId(userId) };
-    if (startDate || endDate) {
-        match.date = {};
-        if (startDate) match.date.$gte = new Date(startDate);
-        if (endDate) match.date.$lte = new Date(endDate);
+  // Helper to build date clause
+  const buildParams = (dateCol) => {
+    const conditions = [];
+    const args = [];
+    if (startDate) {
+      conditions.push(`date(${dateCol}) >= date(?)`);
+      args.push(startDate);
     }
-    return match;
+    if (endDate) {
+      conditions.push(`date(${dateCol}) <= date(?)`);
+      args.push(endDate);
+    }
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    return { where, args };
+  };
+
+  // 1. Sales & Orders
+  const inv = buildParams('date');
+  const salesStats = db.prepare(`
+    SELECT 
+      COALESCE(SUM(total), 0) as sales, 
+      COUNT(*) as orders 
+    FROM invoices 
+    ${inv.where}
+  `).get(...inv.args);
+
+  const sales = salesStats.sales || 0;
+  const orders = salesStats.orders || 0;
+  const aov = orders > 0 ? (sales / orders) : 0;
+
+  // 2. Expenses
+  const exp = buildParams('date');
+  const expenses = db.prepare(`
+    SELECT COALESCE(SUM(amount), 0) as total 
+    FROM expenses 
+    ${exp.where}
+  `).get(...exp.args).total || 0;
+
+  // 3. Profit
+  const netProfit = sales - expenses;
+
+  // 4. Counts
+  const totalCustomers = db.prepare(`SELECT COUNT(*) as count FROM customers`).get().count || 0;
+
+  const pendingInvoices = db.prepare(`
+    SELECT COUNT(*) as count FROM invoices WHERE status = 'Unpaid' OR status = 'Pending'
+  `).get().count || 0;
+
+  // Return structure supporting BOTH Dashboard.jsx (flat) and ReportsPage.jsx (nested)
+  res.json({
+    // New Structure
+    sales: { value: sales, prev: 0, change: 0, sparkline: [] },
+    orders: { value: orders, prev: 0, change: 0 },
+    expenses: { value: expenses, prev: 0, change: 0 },
+    netProfit: { value: netProfit, prev: 0, change: 0 },
+    aov: { value: aov, prev: 0, change: 0 },
+
+    // Legacy Structure (for Dashboard.jsx)
+    totalSales: sales,
+    totalOrders: orders,
+    totalCustomers: totalCustomers,
+    totalExpenses: expenses,
+    pendingInvoices: pendingInvoices,
+    trends: { sales: 0, orders: 0 } // Mock trends for Dashboard.jsx
+  });
 };
 
-// Helper to get daily trend for a specific field/model
-const getDailyTrend = async (model, match, field = 'total', days = 14) => { // Fetch 7 visible + 7 previous for sparkline smoothening/context if needed
-    const trend = await model.aggregate([
-        { $match: match },
-        {
-            $group: {
-                _id: { $dateToString: { format: "%Y-%m-%d", date: "$date" } },
-                value: { $sum: `$${field}` }
-            }
-        },
-        { $sort: { _id: 1 } }
-    ]);
+/**
+ * Financial summary
+ */
+exports.getFinancials = async (req, res) => {
+  const db = await withDB(req);
+  const { startDate, endDate } = req.query;
 
-    // Fill missing dates
-    const result = [];
-    const endDate = match.date?.$lte ? new Date(match.date.$lte) : new Date();
-    // Default to last 7 days if no range
+  // Build Filter
+  let querySales = `SELECT COALESCE(SUM(total), 0) AS value FROM invoices WHERE 1=1`;
+  let queryExpenses = `SELECT COALESCE(SUM(amount), 0) AS value FROM expenses WHERE 1=1`;
+  const args = [];
 
-    // Simple mapping for now: just return the data points we have, 
-    // frontend can handle gaps or we fill them here.
-    return trend.map(t => ({ date: t._id, value: t.value }));
+  if (startDate) {
+    querySales += ` AND date(date) >= date(?)`;
+    queryExpenses += ` AND date(date) >= date(?)`;
+    args.push(startDate);
+  }
+  if (endDate) {
+    querySales += ` AND date(date) <= date(?)`;
+    queryExpenses += ` AND date(date) <= date(?)`;
+    args.push(endDate);
+  }
+
+  // Execute
+  // Note: args need to be doubled for expenses if we used a single query, but here we run two separate queries
+  // We need to re-construct args for each query
+
+  const argsSales = [];
+  const argsExpenses = [];
+  if (startDate) { argsSales.push(startDate); argsExpenses.push(startDate); }
+  if (endDate) { argsSales.push(endDate); argsExpenses.push(endDate); }
+
+  const income = db.prepare(querySales).get(...argsSales).value;
+  const expenses = db.prepare(queryExpenses).get(...argsExpenses).value;
+
+  res.json({
+    income,
+    expenses,
+    profit: income - expenses,
+  });
 };
 
-// @desc    Get dashboard stats (Enhanced with Sparklines & Comparisons)
-// @route   GET /reports/dashboard
-// @access  Private
-const getDashboardStats = asyncHandler(async (req, res) => {
-    const userId = req.user._id;
-    const { startDate, endDate } = req.query;
+/**
+ * Top products
+ */
+exports.getTopProducts = async (req, res) => {
+  const db = await withDB(req);
+  const { startDate, endDate } = req.query;
 
-    const dateMatch = buildDateMatch(userId, startDate, endDate);
+  let query = `SELECT items FROM invoices WHERE 1=1`;
+  const params = [];
 
-    // Previous Period Logic
-    let prevStartDate, prevEndDate;
-    if (startDate && endDate) {
-        const start = new Date(startDate);
-        const end = new Date(endDate);
-        const duration = end - start;
-        prevEndDate = new Date(start.getTime() - 1);
-        prevStartDate = new Date(prevEndDate.getTime() - duration);
-    } else {
-        const now = new Date();
-        const startOfToday = new Date(now.setHours(0, 0, 0, 0));
-        prevEndDate = new Date(startOfToday.getTime() - 1);
-        prevStartDate = new Date(prevEndDate.getTime() - (24 * 60 * 60 * 1000 * 7)); // Compare to prev week by default
+  if (startDate) {
+    query += ` AND date(date) >= date(?)`;
+    params.push(startDate);
+  }
+  if (endDate) {
+    query += ` AND date(date) <= date(?)`;
+    params.push(endDate);
+  }
+
+  // Using JS aggregation to be safe with SQLite JSON nuances in this env
+  const invoices = db.prepare(query).all(...params);
+
+  const productStats = {};
+
+  invoices.forEach(inv => {
+    try {
+      const items = JSON.parse(inv.items);
+      if (Array.isArray(items)) {
+        items.forEach(item => {
+          if (item.name) {
+            productStats[item.name] = (productStats[item.name] || 0) + (item.quantity || 0);
+          }
+        });
+      }
+    } catch (e) {
+      // ignore parse errors
     }
-    const prevMatch = buildDateMatch(userId, prevStartDate.toISOString(), prevEndDate.toISOString());
+  });
 
-    // Parallel Aggregation
-    const [
-        currentSales, prevSales,
-        currentOrders, prevOrders,
-        currentExpenses, prevExpenses,
-        salesTrend
-    ] = await Promise.all([
-        Invoice.aggregate([{ $match: dateMatch }, { $group: { _id: null, total: { $sum: "$total" } } }]),
-        Invoice.aggregate([{ $match: prevMatch }, { $group: { _id: null, total: { $sum: "$total" } } }]),
-        Invoice.countDocuments(dateMatch),
-        Invoice.countDocuments(prevMatch),
-        Expense.aggregate([{ $match: dateMatch }, { $group: { _id: null, total: { $sum: "$amount" } } }]),
-        Expense.aggregate([{ $match: prevMatch }, { $group: { _id: null, total: { $sum: "$amount" } } }]),
-        getDailyTrend(Invoice, dateMatch, 'total')
-    ]);
+  const sortedProducts = Object.entries(productStats)
+    .map(([name, quantity]) => ({ name, quantity }))
+    .sort((a, b) => b.quantity - a.quantity)
+    .slice(0, 5);
 
-    const stats = {
-        sales: {
-            value: currentSales[0]?.total || 0,
-            prev: prevSales[0]?.total || 0,
-            change: 0,
-            sparkline: salesTrend
-        },
-        orders: {
-            value: currentOrders || 0,
-            prev: prevOrders || 0,
-            change: 0
-        },
-        expenses: {
-            value: currentExpenses[0]?.total || 0,
-            prev: prevExpenses[0]?.total || 0,
-            change: 0
-        },
-        netProfit: {
-            value: (currentSales[0]?.total || 0) - (currentExpenses[0]?.total || 0),
-            prev: (prevSales[0]?.total || 0) - (prevExpenses[0]?.total || 0),
-            change: 0
-        },
-        aov: {
-            value: currentOrders > 0 ? (currentSales[0]?.total || 0) / currentOrders : 0,
-            prev: prevOrders > 0 ? (prevSales[0]?.total || 0) / prevOrders : 0,
-            change: 0
-        }
-    };
-
-    // Calculate Percent Changes
-    Object.keys(stats).forEach(key => {
-        const { value, prev } = stats[key];
-        if (prev === 0) stats[key].change = value > 0 ? 100 : 0;
-        else stats[key].change = ((value - prev) / prev) * 100;
-    });
-
-    res.json(stats);
-});
-
-// @desc    Get Customer Metrics (New vs Returning, CLV)
-// @route   GET /reports/customers
-// @access  Private
-const getCustomerMetrics = asyncHandler(async (req, res) => {
-    const userId = req.user._id;
-    const { startDate, endDate } = req.query;
-    const match = buildDateMatch(userId, startDate, endDate);
-
-    // 1. New Customers: Created within range
-    // 2. Returning Customers: Placed order in range AND have > 1 order total (simplified)
-    // For MVP efficiency:
-    // "New" = First invoice within date range.
-    // "Returning" = Invoice in range, but first invoice was BEFORE start date.
-
-    // Actually, simpler:
-    // Get all invoices in range. Group by customerId.
-    // Check min(date) for each customerId globally.
-
-    // Let's stick to simple aggregates for speed:
-    // Total Unique Customers in Period
-    const uniqueCustomersInPeriod = await Invoice.distinct('customerId', match);
-    const totalCustomersInPeriod = uniqueCustomersInPeriod.length;
-
-    // To differentiate New vs Returning properly requires looking up Customer creation date or history.
-    // We'll use Customer model 'createdAt' for "New" approximation.
-    const customerDateMatch = { userId: new mongoose.Types.ObjectId(userId) };
-    if (startDate) customerDateMatch.createdAt = { $gte: new Date(startDate), $lte: new Date(endDate || Date.now()) };
-
-    const newCustomersCount = await Customer.countDocuments(customerDateMatch);
-    const returningCustomersCount = Math.max(0, totalCustomersInPeriod - newCustomersCount);
-
-    // CLV: Total Revenue / Total Unique Customers (All Time)
-    // Or CLV in Period: Revenue / Customers
-    const totalRevenueResult = await Invoice.aggregate([
-        { $match: match },
-        { $group: { _id: null, total: { $sum: "$total" } } }
-    ]);
-    const revenue = totalRevenueResult[0]?.total || 0;
-    const clv = totalCustomersInPeriod > 0 ? revenue / totalCustomersInPeriod : 0;
-
-    res.json({
-        newCustomers: newCustomersCount,
-        returningCustomers: returningCustomersCount,
-        repeatRate: totalCustomersInPeriod > 0 ? (returningCustomersCount / totalCustomersInPeriod) * 100 : 0,
-        clv
-    });
-});
-
-// @desc    Get financials  
-// @route   GET /reports/financials
-// @access  Private
-const getFinancials = asyncHandler(async (req, res) => {
-    const userId = req.user._id;
-    const { startDate, endDate } = req.query;
-
-    const invoiceMatch = buildDateMatch(userId, startDate, endDate);
-    const expenseMatch = { userId: new mongoose.Types.ObjectId(userId) };
-    if (startDate || endDate) {
-        expenseMatch.date = {};
-        if (startDate) expenseMatch.date.$gte = new Date(startDate);
-        if (endDate) expenseMatch.date.$lte = new Date(endDate);
-    }
-
-    const [salesResult, expensesResult, countResult] = await Promise.all([
-        Invoice.aggregate([
-            { $match: invoiceMatch },
-            { $group: { _id: null, total: { $sum: "$total" }, count: { $sum: 1 } } }
-        ]),
-        Expense.aggregate([
-            { $match: expenseMatch },
-            { $group: { _id: null, total: { $sum: "$amount" } } }
-        ]),
-        Invoice.countDocuments(invoiceMatch) // Use match with date for count
-    ]);
-
-    const totalSales = salesResult[0] ? salesResult[0].total : 0;
-    const totalOrders = countResult; // This is now filtered
-    const totalExpenses = expensesResult[0] ? expensesResult[0].total : 0;
-
-    const avgOrderValue = totalOrders > 0 ? totalSales / totalOrders : 0;
-    const netProfit = totalSales - totalExpenses;
-
-    res.json({
-        totalSales,
-        totalOrders,
-        avgOrderValue,
-        totalExpenses,
-        netProfit
-    });
-});
-
-
-// @desc    Get Sales Trend (Comparison Support)
-// @route   GET /reports/sales-trend
-// @access  Private
-const getSalesTrend = asyncHandler(async (req, res) => {
-    const userId = req.user._id;
-    const { startDate, endDate } = req.query;
-    const match = buildDateMatch(userId, startDate, endDate);
-
-    const trend = await Invoice.aggregate([
-        { $match: match },
-        {
-            $group: {
-                _id: { $dateToString: { format: "%Y-%m-%d", date: "$date" } },
-                sales: { $sum: "$total" },
-                orders: { $sum: 1 },
-                profit: { $sum: { $subtract: ["$total", { $ifNull: ["$totalCost", 0] }] } } // Needs cost logic if available
-            }
-        },
-        { $sort: { _id: 1 } },
-        {
-            $project: {
-                date: "$_id",
-                sales: 1,
-                orders: 1,
-                _id: 0
-            }
-        }
-    ]);
-
-    res.json(trend);
-});
-
-// @desc    Get Payment Methods
-// @route   GET /reports/payment-methods
-// @access  Private
-const getPaymentMethods = asyncHandler(async (req, res) => {
-    const userId = req.user._id;
-    const { startDate, endDate } = req.query;
-    const match = buildDateMatch(userId, startDate, endDate);
-
-    const stats = await Invoice.aggregate([
-        { $match: match },
-        {
-            $group: {
-                _id: "$paymentMethod",
-                value: { $sum: "$total" },
-                count: { $sum: 1 }
-            }
-        },
-        {
-            $project: {
-                name: { $ifNull: ["$_id", "Other"] },
-                value: 1,
-                count: 1,
-                _id: 0
-            }
-        },
-        { $sort: { value: -1 } }
-    ]);
-    res.json(stats);
-});
-
-// @desc    Get Top Products/Categories/Brands
-// @route   GET /reports/top-products
-// @access  Private
-const getTopProducts = asyncHandler(async (req, res) => {
-    const userId = req.user._id;
-    const { startDate, endDate, groupBy = 'product' } = req.query; // product, category, brand
-    const match = buildDateMatch(userId, startDate, endDate);
-
-    // Grouping Field Selection
-    let groupId;
-    let localField = "_id";
-    let foreignField = "_id";
-    let lookupFrom = "products";
-    let lookupAs = "info";
-    let nameField = "$info.name";
-
-    if (groupBy === 'category') {
-        // Group by product Category first?
-        // Actually Invoice items stores productId. Product has category.
-        // We need to look up first.
-        const results = await Invoice.aggregate([
-            { $match: match },
-            { $unwind: "$items" },
-            {
-                $lookup: {
-                    from: "products",
-                    localField: "items.productId",
-                    foreignField: "_id",
-                    as: "product"
-                }
-            },
-            { $unwind: "$product" },
-            {
-                $group: {
-                    _id: "$product.category",
-                    revenue: { $sum: "$items.total" },
-                    quantity: { $sum: "$items.quantity" },
-                    cost: { $sum: { $multiply: ["$items.quantity", { $ifNull: ["$product.costPrice", 0] }] } }
-                }
-            },
-            {
-                $project: {
-                    name: "$_id",
-                    revenue: 1,
-                    quantity: 1,
-                    margin: { $subtract: ["$revenue", "$cost"] },
-                    _id: 0
-                }
-            },
-            { $sort: { revenue: -1 } },
-            { $limit: 20 }
-        ]);
-        return res.json(results);
-
-    } else if (groupBy === 'brand') {
-        const results = await Invoice.aggregate([
-            { $match: match },
-            { $unwind: "$items" },
-            {
-                $lookup: {
-                    from: "products",
-                    localField: "items.productId",
-                    foreignField: "_id",
-                    as: "product"
-                }
-            },
-            { $unwind: "$product" },
-            {
-                $group: {
-                    _id: "$product.brand",
-                    revenue: { $sum: "$items.total" },
-                    quantity: { $sum: "$items.quantity" },
-                    cost: { $sum: { $multiply: ["$items.quantity", { $ifNull: ["$product.costPrice", 0] }] } }
-                }
-            },
-            {
-                $project: {
-                    name: { $ifNull: ["$_id", "Unknown Brand"] },
-                    revenue: 1,
-                    quantity: 1,
-                    margin: { $subtract: ["$revenue", "$cost"] },
-                    _id: 0
-                }
-            },
-            { $sort: { revenue: -1 } },
-            { $limit: 20 }
-        ]);
-        return res.json(results);
-    }
-
-    // Default: Group by Product
-    const topProducts = await Invoice.aggregate([
-        { $match: match },
-        { $unwind: "$items" },
-        {
-            $group: {
-                _id: "$items.productId",
-                quantity: { $sum: "$items.quantity" },
-                revenue: { $sum: "$items.total" }
-            }
-        },
-        {
-            $lookup: {
-                from: "products",
-                localField: "_id",
-                foreignField: "_id",
-                as: "productInfo"
-            }
-        },
-        { $unwind: { path: "$productInfo", preserveNullAndEmptyArrays: true } },
-        {
-            $project: {
-                name: { $ifNull: ["$productInfo.name", "Unknown Product"] },
-                quantity: 1,
-                revenue: 1,
-                costPrice: { $ifNull: ["$productInfo.costPrice", 0] }
-            }
-        },
-        {
-            $addFields: {
-                totalCost: { $multiply: ["$quantity", "$costPrice"] }
-            }
-        },
-        {
-            $addFields: {
-                marginValue: { $subtract: ["$revenue", "$totalCost"] }
-            }
-        },
-        {
-            $addFields: {
-                marginPercent: {
-                    $cond: [
-                        { $gt: ["$revenue", 0] },
-                        { $multiply: [{ $divide: ["$marginValue", "$revenue"] }, 100] },
-                        0
-                    ]
-                }
-            }
-        },
-        { $sort: { revenue: -1 } },
-        { $limit: 50 },
-        {
-            $project: {
-                name: 1,
-                quantity: 1,
-                revenue: 1,
-                marginPercent: 1,
-                marginValue: 1,
-                _id: 0
-            }
-        }
-    ]);
-    res.json(topProducts);
-});
-
-module.exports = {
-    getDashboardStats,
-    getFinancials,
-    getSalesTrend,
-    getPaymentMethods,
-    getTopProducts,
-    getCustomerMetrics
+  res.json(sortedProducts);
 };
 
+exports.getPaymentMethods = async (req, res) => {
+  const db = await withDB(req);
+  const { startDate, endDate } = req.query;
+
+  let query = `SELECT payments FROM invoices WHERE 1=1`;
+  const params = [];
+
+  if (startDate) {
+    query += ` AND date(date) >= date(?)`;
+    params.push(startDate);
+  }
+  if (endDate) {
+    query += ` AND date(date) <= date(?)`;
+    params.push(endDate);
+  }
+
+  const invoices = db.prepare(query).all(...params);
+  const methodStats = {};
+
+  invoices.forEach(inv => {
+    try {
+      const payments = JSON.parse(inv.payments);
+      if (Array.isArray(payments)) {
+        payments.forEach(p => {
+          if (p.mode && p.amount) {
+            methodStats[p.mode] = (methodStats[p.mode] || 0) + parseFloat(p.amount);
+          }
+        });
+      }
+    } catch (e) {
+      // ignore
+    }
+  });
+
+  const result = Object.entries(methodStats).map(([method, amount]) => ({
+    name: method,
+    value: amount
+  }));
+
+  res.json(result);
+};
+
+exports.getSalesTrend = async (req, res) => {
+  const db = await withDB(req);
+  const { startDate, endDate } = req.query;
+
+  let query = `SELECT date, total FROM invoices WHERE 1=1`;
+  const params = [];
+
+  if (startDate) {
+    query += ` AND date(date) >= date(?)`;
+    params.push(startDate);
+  }
+  if (endDate) {
+    query += ` AND date(date) <= date(?)`;
+    params.push(endDate);
+  }
+  query += ` ORDER BY date ASC`;
+
+  const invoices = db.prepare(query).all(...params);
+
+  // Aggregate by day
+  const trend = {};
+
+  invoices.forEach(inv => {
+    const day = inv.date.split('T')[0]; // Simple YYYY-MM-DD extraction
+    trend[day] = (trend[day] || 0) + (inv.total || 0);
+  });
+
+  const result = Object.entries(trend)
+    .map(([date, amount]) => ({ date, sales: amount }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  res.json(result);
+};
+
+exports.getCustomerMetrics = async (req, res) => {
+  const db = await withDB(req);
+  const { startDate, endDate } = req.query;
+
+  // New Customers in period
+  let newCustQuery = `SELECT COUNT(*) as count FROM customers WHERE 1=1`;
+  const newCustParams = [];
+  if (startDate) {
+    newCustQuery += ` AND date(createdAt) >= date(?)`;
+    newCustParams.push(startDate);
+  }
+  if (endDate) {
+    newCustQuery += ` AND date(createdAt) <= date(?)`;
+    newCustParams.push(endDate);
+  }
+  const newCustomers = db.prepare(newCustQuery).get(...newCustParams)?.count || 0;
+
+  // Returning customers (bought in period and has previous orders, or just > 1 order total?)
+  // Let's go with: customers who bought in this period and have > 1 invoice total.
+  // First get customers who bought in period
+  let activeCustQuery = `SELECT DISTINCT customer_id FROM invoices WHERE 1=1`;
+  const activeCustParams = [];
+  if (startDate) {
+    activeCustQuery += ` AND date(date) >= date(?)`;
+    activeCustParams.push(startDate);
+  }
+  if (endDate) {
+    activeCustQuery += ` AND date(date) <= date(?)`;
+    activeCustParams.push(endDate);
+  }
+  const activeCustomers = db.prepare(activeCustQuery).all(...activeCustParams).map(c => c.customer_id);
+
+  let returningCustomers = 0;
+  if (activeCustomers.length > 0) {
+    const placeholders = activeCustomers.map(() => '?').join(',');
+    // Check which of these have > 1 invoice
+    const returningCount = db.prepare(`
+      SELECT COUNT(DISTINCT customer_id) as count 
+      FROM invoices 
+      WHERE customer_id IN (${placeholders}) 
+      GROUP BY customer_id 
+      HAVING COUNT(*) > 1
+    `).all(...activeCustomers).length;
+    returningCustomers = returningCount;
+  }
+
+  const totalActive = activeCustomers.length;
+  const repeatRate = totalActive > 0 ? (returningCustomers / totalActive) * 100 : 0;
+
+  // CLV - Average value of all orders per customer (simplified)
+  // or Total Sales / Total Unique Customers (All Time)
+  const clvStats = db.prepare(`
+    SELECT 
+      SUM(total) as totalSales, 
+      COUNT(DISTINCT customer_id) as totalCust 
+    FROM invoices
+  `).get();
+
+  const clv = clvStats.totalCust > 0 ? (clvStats.totalSales / clvStats.totalCust) : 0;
+
+  res.json({
+    newCustomers,
+    returningCustomers,
+    repeatRate,
+    clv
+  });
+};

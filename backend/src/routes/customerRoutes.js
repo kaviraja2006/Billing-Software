@@ -1,21 +1,22 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const {
-    getCustomers,
-    getCustomerById,
-    createCustomer,
-    updateCustomer,
-    deleteCustomer,
-    searchDuplicates,
-} = require('../controllers/customerController');
-const { protect } = require('../middleware/authMiddleware');
+const { protect } = require("../middleware/authMiddleware");
 
-router.route('/').get(protect, getCustomers).post(protect, createCustomer);
-router.route('/search-duplicates').get(protect, searchDuplicates);
-router
-    .route('/:id')
-    .get(protect, getCustomerById)
-    .put(protect, updateCustomer)
-    .delete(protect, deleteCustomer);
+const {
+  getCustomers,
+  getCustomerById,
+  createCustomer,
+  updateCustomer,
+  deleteCustomer,
+  searchDuplicates,
+} = require("../controllers/customerController");
+
+
+router.get("/", protect, getCustomers);
+router.get("/search-duplicates", protect, searchDuplicates);
+router.get("/:id", protect, getCustomerById);
+router.post("/", protect, createCustomer);
+router.put("/:id", protect, updateCustomer);
+router.delete("/:id", protect, deleteCustomer);
 
 module.exports = router;

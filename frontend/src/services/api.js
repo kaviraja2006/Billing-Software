@@ -2,22 +2,22 @@ import axios from 'axios';
 
 // Vite uses import.meta.env for environment variables.
 // Variables must start with VITE_ to be exposed to the client.
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
 
 const api = axios.create({
-    baseURL: "http://localhost:5000",
+    baseURL: "http://127.0.0.1:5000",
     headers: {
         'Content-Type': 'application/json',
     },
     withCredentials: true
 });
 
-// Request interceptor to attach token
+// Request interceptor to add JWT token
 api.interceptors.request.use(
     (config) => {
         const token = localStorage.getItem('token');
         if (token) {
-            config.headers['Authorization'] = `Bearer ${token}`;
+            config.headers.Authorization = `Bearer ${token}`;
         }
         return config;
     },
@@ -28,22 +28,12 @@ api.interceptors.request.use(
 api.interceptors.response.use(
     (response) => response,
     (error) => {
-        // Handle network errors (server not running, connection refused, etc.)
-        if (!error.response) {
-            console.error('Network error: Backend server may not be reachable (CORS, server down, or invalid URL).');
-        } else {
-            // Log detailed API error for debugging
-            console.error('API Error:', error.response.status, error.response.data);
+        if (error.response?.status === 401) {
+            // Clear invalid token
+            localStorage.removeItem('token');
+            return Promise.reject(error);
         }
-
-        if (error.response && error.response.status === 401) {
-            // Only redirect if not already on login page
-            if (!window.location.pathname.includes('/login')) {
-                localStorage.removeItem('token');
-                localStorage.removeItem('user');
-                window.location.href = '/login';
-            }
-        }
+        console.error("API error:", error);
         return Promise.reject(error);
     }
 );
@@ -142,6 +132,10 @@ const services = {
     settings: {
         getSettings: () => isElectron ? ipcResponse(window.electron.settings.getSettings()) : api.get('/settings'),
         updateSettings: (data) => isElectron ? ipcResponse(window.electron.settings.updateSettings(data)) : api.put('/settings', data),
+    },
+    backup: {
+        trigger: () => api.post('/backup/trigger'),
+        getStatus: () => api.get('/backup/status'),
     },
 };
 

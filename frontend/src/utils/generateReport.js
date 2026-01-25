@@ -33,7 +33,7 @@ export const generateDashboardReport = (data) => {
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(32);
     doc.setFont('times', 'bold');
-    doc.text('Zilling', pageWidth / 2, 22, { align: 'center' });
+    doc.text('Kwiqbill', pageWidth / 2, 22, { align: 'center' });
 
     // Report Title
     doc.setFontSize(16);

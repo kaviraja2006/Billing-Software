@@ -1,42 +1,31 @@
-const asyncHandler = require('express-async-handler');
-const Settings = require('../models/settingsModel');
+const { withDB } = require("../db/db");
+const { syncTableToJson } = require("../db/syncToJson");
 
-// @desc    Get settings
-// @route   GET /settings
-// @access  Private
-const getSettings = asyncHandler(async (req, res) => {
-    // Get settings for authenticated user only
-    let settings = await Settings.findOne({ userId: req.user._id });
+exports.getSettings = async (req, res) => {
+  const db = await withDB(req);
+  const row = db.prepare(`SELECT data FROM settings LIMIT 1`).get();
 
-    if (!settings) {
-        // Create default settings for this user
-        settings = await Settings.create({ userId: req.user._id });
-    }
+  res.json(row ? JSON.parse(row.data) : {});
+};
 
-    res.json(settings);
-});
+exports.saveSettings = async (req, res) => {
+  const db = await withDB(req);
 
-// @desc    Update settings
-// @route   PUT /settings
-// @access  Private
-const updateSettings = asyncHandler(async (req, res) => {
-    // Update settings for authenticated user only
-    let settings = await Settings.findOne({ userId: req.user._id });
+  db.prepare(`
+    INSERT INTO settings (id, data, updated_at)
+    VALUES ('singleton', ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      data = excluded.data,
+      updated_at = excluded.updated_at
+  `).run(JSON.stringify(req.body), new Date().toISOString());
 
-    if (!settings) {
-        settings = await Settings.create({ ...req.body, userId: req.user._id });
-    } else {
-        settings = await Settings.findOneAndUpdate(
-            { userId: req.user._id },
-            { $set: req.body },
-            { new: true, upsert: false }
-        );
-    }
+  // 🔄 AUTO JSON SYNC
+  syncTableToJson({
+    db,
+    table: "settings",
+    userBaseDir: req.userBaseDir,
+    map: s => JSON.parse(s.data || "{}")
+  });
 
-    res.json(settings);
-});
-
-module.exports = {
-    getSettings,
-    updateSettings,
+  res.json({ success: true });
 };

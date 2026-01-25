@@ -17,27 +17,37 @@ const CalculatorModal = ({ isOpen, onClose }) => {
     };
 
     const handleOperator = (op) => {
-        setEquation(display + ' ' + op + ' ');
+        // Prevent adding multiple operators or incomplete states if needed
+        // For simple chaining: append current display + op
+        // Check if we just added an operator? 
+        // If shouldResetDisplay is true, it means we just pressed an operator or equals
+        // If we just pressed equals, equation is empty, so we start new: display + op
+        // If we just pressed an operator, strictly we might want to replace the last operator, but let's keep it simple: 
+        // Standard calc behavior: execute pending if needed or build string.
+        // Let's implement accumulation:
+
+        if (shouldResetDisplay && equation !== '') {
+            // Operator change? e.g. 5 + (oops) * -> 5 *
+            // logic: remove last op and add new one
+            setEquation(equation.trim().slice(0, -1) + ' ' + op + ' ');
+        } else {
+            setEquation(equation + display + ' ' + op + ' ');
+        }
         setShouldResetDisplay(true);
     };
 
     const handleEqual = () => {
         try {
-            // Safe evaluation of the equation
-            // Combine previous equation part with current display
-            // ex: "5 + " and "3" -> "5 + 3"
             const fullEquation = equation + display;
 
-            // Replace visual operators with JS operators if needed (though we use standard symbols mostly)
-            // x -> * is already handled if we store '*'
-
             // eslint-disable-next-line no-eval
-            const result = eval(fullEquation.replace(/x/g, '*').replace(/÷/g, '/'));
+            const result = safeCalculate(fullEquation.replace(/x/g, '*').replace(/÷/g, '/'));
 
             setDisplay(String(Number(result).toFixed(2)).replace(/\.00$/, '')); // Clean formatting
             setEquation('');
             setShouldResetDisplay(true);
         } catch (error) {
+            console.error(error);
             setDisplay('Error');
             setShouldResetDisplay(true);
             setEquation('');
@@ -149,5 +159,41 @@ const Btn = ({ children, onClick, className = "" }) => (
         {children}
     </button>
 );
+
+const safeCalculate = (expression) => {
+    // 1. Tokenize
+    const tokens = expression.match(/(\d+(\.\d*)?|\.\d+|[\+\-\*\/])/g);
+    if (!tokens) return 0;
+
+    // 2. Process * and / (Order of Operations)
+    const intermediate = [];
+    let i = 0;
+    while (i < tokens.length) {
+        const token = tokens[i];
+        if (token === '*' || token === '/') {
+            const prev = parseFloat(intermediate.pop());
+            const next = parseFloat(tokens[i + 1]);
+            let res = 0;
+            if (token === '*') res = prev * next;
+            if (token === '/') res = prev / next;
+            intermediate.push(res);
+            i += 2;
+        } else {
+            intermediate.push(token);
+            i++;
+        }
+    }
+
+    // 3. Process + and -
+    let result = parseFloat(intermediate[0]);
+    for (let j = 1; j < intermediate.length; j += 2) {
+        const op = intermediate[j];
+        const val = parseFloat(intermediate[j + 1]);
+        if (op === '+') result += val;
+        if (op === '-') result -= val;
+    }
+
+    return isNaN(result) ? 'Error' : result;
+};
 
 export default CalculatorModal;

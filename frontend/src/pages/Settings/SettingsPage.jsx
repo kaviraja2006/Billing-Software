@@ -5,7 +5,7 @@ import { Card, CardContent } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import {
     Store, Receipt, Calculator, Printer, Globe, Layout,
-    Save, RotateCcw, Plus, Trash2, Eye, CheckCircle, FileText
+    Save, RotateCcw, Plus, Trash2, Eye, CheckCircle, FileText, Cloud
 } from 'lucide-react';
 import { useSettings } from '../../context/SettingsContext';
 import { cn } from '../../lib/utils';
@@ -109,7 +109,23 @@ const SettingsPage = () => {
         { id: 'tax', label: 'Tax & GST', icon: Calculator },
         { id: 'invoice', label: 'Invoice Design', icon: Layout },
         { id: 'print', label: 'Printer & Local', icon: Printer },
+        { id: 'backup', label: 'Data Backup', icon: Cloud },
     ];
+
+    const [backupLoading, setBackupLoading] = useState(false);
+    const [backupStatus, setBackupStatus] = useState(null);
+
+    const handleBackup = async () => {
+        setBackupLoading(true);
+        try {
+            const res = await services.backup.trigger();
+            setBackupStatus({ success: true, timestamp: res.data.timestamp });
+        } catch (err) {
+            setBackupStatus({ success: false, error: err.message });
+        } finally {
+            setBackupLoading(false);
+        }
+    };
 
     if (!settings) return <div className="p-10 flex justifying-center">Loading Settings...</div>;
 
@@ -433,6 +449,68 @@ const SettingsPage = () => {
                         </Card>
                     </div>
                 );
+            case 'backup':
+                return (
+                    <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
+                        <Card>
+                            <CardContent className="p-6 space-y-6">
+                                <div className="flex items-center gap-4">
+                                    <div className="p-3 bg-emerald-50 rounded-full">
+                                        <Cloud className="h-6 w-6 text-emerald-600" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-semibold text-slate-800">Google Drive Backup</h3>
+                                        <p className="text-sm text-slate-500">
+                                            Your data is automatically backed up to your Google Drive in the
+                                            <code className="mx-1 bg-slate-100 px-1 rounded text-xs">/BillingSoftware</code> folder.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="border-t pt-4">
+                                    <h4 className="font-medium text-slate-700 mb-2">Backup Status</h4>
+                                    <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 flex justify-between items-center">
+                                        <div>
+                                            <p className="text-sm font-medium text-slate-800">
+                                                {backupStatus?.success
+                                                    ? "Last Backup Successful"
+                                                    : "System Ready"}
+                                            </p>
+                                            <p className="text-xs text-slate-500">
+                                                {backupStatus?.timestamp
+                                                    ? new Date(backupStatus.timestamp).toLocaleString()
+                                                    : "Automatic mode active"}
+                                            </p>
+                                        </div>
+                                        <Button
+                                            onClick={handleBackup}
+                                            disabled={backupLoading}
+                                            variant="outline"
+                                            className="border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                                        >
+                                            {backupLoading ? "Backing up..." : "Backup Now"}
+                                        </Button>
+                                    </div>
+                                    {backupStatus?.success === false && (
+                                        <p className="text-xs text-rose-600 mt-2">
+                                            Error: {backupStatus.error || "Check internet connection or re-login."}
+                                        </p>
+                                    )}
+                                </div>
+
+                                <div className="bg-blue-50 p-4 rounded-lg flex gap-3 text-sm text-blue-800">
+                                    <CheckCircle className="h-5 w-5 flex-shrink-0" />
+                                    <div>
+                                        <p className="font-semibold">Local-First Security</p>
+                                        <p className="opacity-90 mt-1">
+                                            Your main database is always on this computer. Google Drive only holds encrypted JSON copies for emergency recovery.
+                                        </p>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                );
             default:
                 return null;
         }
@@ -441,43 +519,45 @@ const SettingsPage = () => {
     return (
         <div className="min-h-screen bg-slate-50/50 pb-20">
             {/* Header */}
-            <div className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200 px-6 py-4 flex justify-between items-center">
+            <div className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200 px-4 sm:px-6 py-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                 <div className="flex items-center gap-3">
-                    <h1 className="text-2xl font-bold text-slate-900">Settings</h1>
+                    <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Settings</h1>
                     {unsavedChanges && (
                         <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 animate-pulse">
                             Unsaved Changes
                         </Badge>
                     )}
                 </div>
-                <div className="flex gap-2">
-                    <Button variant="ghost" onClick={() => window.location.reload()}><RotateCcw className="h-4 w-4 mr-2" /> Reset</Button>
-                    <Button onClick={handleSave} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-200">
+                <div className="flex gap-2 w-full sm:w-auto">
+                    <Button variant="ghost" onClick={() => window.location.reload()} className="flex-1 sm:flex-none"><RotateCcw className="h-4 w-4 mr-2" /> Reset</Button>
+                    <Button onClick={handleSave} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-200 flex-1 sm:flex-none">
                         <Save className="h-4 w-4 mr-2" /> Save Changes
                     </Button>
                 </div>
             </div>
 
-            <div className="flex max-w-7xl mx-auto pt-8 px-6 gap-8">
+            <div className="flex flex-col lg:flex-row max-w-7xl mx-auto pt-8 px-4 sm:px-6 gap-8">
                 {/* Sidebar Navigation */}
-                <div className="w-64 flex-shrink-0 space-y-2">
-                    {tabs.map(tab => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id)}
-                            className={`
-                                w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all
-                                ${activeTab === tab.id
-                                    ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200'
-                                    : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-900'}
-                            `}
-                        >
-                            <tab.icon size={18} />
-                            {tab.label}
-                        </button>
-                    ))}
+                <div className="w-full lg:w-64 flex-shrink-0">
+                    <div className="flex flex-row lg:flex-col gap-2 overflow-x-auto lg:overflow-visible pb-2 lg:pb-0">
+                        {tabs.map(tab => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`
+                                    flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all whitespace-nowrap
+                                    ${activeTab === tab.id
+                                        ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200'
+                                        : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-900'}
+                                `}
+                            >
+                                <tab.icon size={18} />
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
 
-                    <div className="pt-8 px-4">
+                    <div className="hidden lg:block pt-8 px-4">
                         <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">System</p>
                         <p className="text-xs text-slate-400">Version 2.4.0 (Build 2024.1)</p>
                         <p className="text-xs text-slate-400 mt-1">Last Updated: {settings.lastUpdatedAt ? new Date(settings.lastUpdatedAt).toLocaleDateString() : 'Never'}</p>

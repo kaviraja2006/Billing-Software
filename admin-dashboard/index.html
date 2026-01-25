@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics Dashboard - Admin Panel</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <!-- Login Screen -->
+    <div id="loginScreen" class="screen">
+        <div class="login-container">
+            <h1>📊 Analytics Admin</h1>
+            <p class="subtitle">Billing Software Usage Tracking</p>
+
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" required autofocus>
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+
+                <button type="submit" class="btn-primary">Login</button>
+
+                <div id="loginError" class="error-message hidden"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Dashboard Screen -->
+    <div id="dashboardScreen" class="screen hidden">
+        <nav class="navbar">
+            <div class="nav-content">
+                <h2>📊 Analytics Dashboard</h2>
+                <div class="nav-actions">
+                    <span id="adminUsername" class="admin-name"></span>
+                    <button id="logoutBtn" class="btn-secondary">Logout</button>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container">
+            <!-- Stats Cards -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">👥</div>
+                    <div class="stat-content">
+                        <p class="stat-label">Total Users</p>
+                        <p class="stat-value" id="totalUsers">-</p>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon">🟢</div>
+                    <div class="stat-content">
+                        <p class="stat-label">Active Today</p>
+                        <p class="stat-value" id="activeToday">-</p>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon">📅</div>
+                    <div class="stat-content">
+                        <p class="stat-label">Active (7 Days)</p>
+                        <p class="stat-value" id="active7Days">-</p>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon">📊</div>
+                    <div class="stat-content">
+                        <p class="stat-label">Active (30 Days)</p>
+                        <p class="stat-value" id="active30Days">-</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts -->
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <h3>Platform Distribution</h3>
+                    <div id="platformChart" class="chart-content"></div>
+                </div>
+
+                <div class="chart-card">
+                    <h3>Version Distribution</h3>
+                    <div id="versionChart" class="chart-content"></div>
+                </div>
+            </div>
+
+            <!-- Users Table -->
+            <div class="table-card">
+                <div class="table-header">
+                    <h3>Software Users</h3>
+                    <div class="table-actions">
+                        <input type="text" id="searchInput" placeholder="Search users..." class="search-input">
+                        <button id="exportBtn" class="btn-secondary">Export CSV</button>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table id="usersTable">
+                        <thead>
+                            <tr>
+                                <th>User Name</th>
+                                <th>Email</th>
+                                <th>Platform</th>
+                                <th>Version</th>
+                                <th>First Seen</th>
+                                <th>Last Seen</th>
+                                <th>Pings</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersTableBody">
+                            <tr>
+                                <td colspan="8" class="loading">Loading users...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Auto-refresh indicator -->
+            <div class="refresh-indicator">
+                Auto-refreshing every 30 seconds
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>

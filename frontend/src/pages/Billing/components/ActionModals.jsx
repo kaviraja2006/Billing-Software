@@ -102,7 +102,10 @@ export const AdditionalChargesModal = ({ isOpen, onClose, onApply, initialValue 
     );
 };
 
+import { useToast } from '../../../context/ToastContext';
+
 export const LoyaltyPointsModal = ({ isOpen, onClose, onApply, availablePoints = 150 }) => {
+    const toast = useToast();
     // Dummy available points if not provided. In real app, fetch from customer.
     const [pointsToRedeem, setPointsToRedeem] = useState(0);
     const conversionRate = 1.0; // 1 Point = ₹1
@@ -119,7 +122,7 @@ export const LoyaltyPointsModal = ({ isOpen, onClose, onApply, availablePoints =
         e.preventDefault();
         const redeeem = parseInt(pointsToRedeem) || 0;
         if (redeeem > availablePoints) {
-            alert(`You only have ${availablePoints} points!`);
+            toast.error(`You only have ${availablePoints} points!`);
             return;
         }
         onApply(redeeem * conversionRate);

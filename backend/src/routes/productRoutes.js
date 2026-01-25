@@ -1,27 +1,16 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
+
 const {
-    getProducts,
-    getProductById,
-    createProduct,
-    updateProduct,
-    deleteProduct,
-    fixIndexes,
-    getProductStats
-} = require('../controllers/productController');
-const { protect } = require('../middleware/authMiddleware');
+  getProducts,
+  createProduct,
+  updateStock,
+} = require("../controllers/productController");
 
-// Temp route to fix indexes - Ensure this is placed BEFORE /:id
-router.get('/fix-indexes', fixIndexes);
+const { protect } = require("../middleware/authMiddleware");
 
-router.route('/').get(protect, getProducts).post(protect, createProduct);
-
-router.get('/:id/stats', protect, getProductStats);
-
-router
-    .route('/:id')
-    .get(protect, getProductById)
-    .put(protect, updateProduct)
-    .delete(protect, deleteProduct);
+router.get("/", protect, getProducts);
+router.post("/", protect, createProduct);
+router.put("/:id/stock", protect, updateStock);
 
 module.exports = router;

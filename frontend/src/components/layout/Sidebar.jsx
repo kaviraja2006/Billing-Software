@@ -21,9 +21,9 @@ const Sidebar = ({ isOpen = true, toggleSidebar, isMobile, onCloseMobile }) => {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     const handleLogout = async () => {
-    await logout();
-    navigate("/login", { replace: true });
-  };
+        await logout();
+        navigate("/login", { replace: true });
+    };
     const navItems = [
         { label: 'Dashboard', icon: LayoutDashboard, path: '/' },
         { label: 'Billing', icon: Receipt, path: '/billing' },
@@ -54,7 +54,7 @@ const Sidebar = ({ isOpen = true, toggleSidebar, isMobile, onCloseMobile }) => {
                         <Receipt size={20} strokeWidth={2.5} />
                     </div>
                     {isOpen && (
-                        <span className="text-xl font-bold text-body-primary tracking-tight">Zilling</span>
+                        <span className="text-xl font-bold text-body-primary tracking-tight">Kwiqbill</span>
                     )}
                 </div>
                 {/* Mobile Close Toggle */}

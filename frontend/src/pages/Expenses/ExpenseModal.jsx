@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useToast } from '../../context/ToastContext';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
@@ -12,6 +13,7 @@ import { Upload, X, FileText, ExternalLink, Image as ImageIcon, AlertCircle } fr
 const ExpenseModal = ({ isOpen, onClose, expense = null }) => {
     const { addExpense, updateExpense, uploadReceipt } = useExpenses();
     const isEditMode = !!expense;
+    const toast = useToast();
 
     const [formData, setFormData] = useState({
         title: '',
@@ -89,7 +91,7 @@ const ExpenseModal = ({ isOpen, onClose, expense = null }) => {
 
     const handleSubmit = async () => {
         if (!formData.title || !formData.amount || !formData.category) {
-            alert('Please fill in all required fields');
+            toast.warning('Please fill in all required fields');
             return;
         }
 
@@ -130,7 +132,7 @@ const ExpenseModal = ({ isOpen, onClose, expense = null }) => {
 
             onClose();
         } catch (error) {
-            alert(`Failed to ${isEditMode ? 'update' : 'save'} expense: ${error.message}`);
+            toast.error(`Failed to ${isEditMode ? 'update' : 'save'} expense: ${error.message}`);
         } finally {
             setIsSubmitting(false);
         }

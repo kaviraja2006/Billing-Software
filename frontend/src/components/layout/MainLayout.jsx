@@ -16,7 +16,7 @@ const MainLayout = () => {
     }, [location.pathname]);
 
     return (
-        <div className="flex h-screen bg-app overflow-hidden">
+        <div className="flex h-full bg-app overflow-hidden">
             {/* Desktop Sidebar (Hidden on mobile) */}
             <div className={`hidden md:flex ${isSidebarOpen ? 'w-64' : 'w-20'} transition-all duration-300 ease-in-out h-full`}>
                 <Sidebar isOpen={isSidebarOpen} toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
@@ -49,7 +49,7 @@ const MainLayout = () => {
                         >
                             <Menu size={24} className="text-slate-700" />
                         </Button>
-                        <span className="font-semibold text-lg text-slate-800">Zilling</span>
+                        <span className="font-semibold text-lg text-slate-800">Kwiqbill</span>
                     </div>
                 </header>
 

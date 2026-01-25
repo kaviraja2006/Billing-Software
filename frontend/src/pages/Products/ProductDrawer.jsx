@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useToast } from '../../context/ToastContext';
 import { Drawer } from '../../components/ui/Drawer';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
@@ -77,6 +78,7 @@ const ProductDrawer = ({ isOpen, onClose, product, onSave, existingUnits, existi
     const [isLookingUp, setIsLookingUp] = useState(false);
     const [showUnitSuggestions, setShowUnitSuggestions] = useState(false);
     const priceInputRef = useRef(null);
+    const toast = useToast();
 
     // Reset or Populate Form
     useEffect(() => {
@@ -166,20 +168,20 @@ const ProductDrawer = ({ isOpen, onClose, product, onSave, existingUnits, existi
 
     const handleSave = async (addAnother = false) => {
         if (!formData.name) {
-            alert('Product Name is required.');
+            toast.warning('Product Name is required.');
             return;
         }
 
         // Basic validation for variants
         if (formData.hasVariants) {
             if (formData.variants.length === 0) {
-                alert('Please add at least one variant or disable variants.');
+                toast.warning('Please add at least one variant or disable variants.');
                 return;
             }
             // Check for empty names
             const invalidVariant = formData.variants.find(v => !v.options[0] || v.options[0].trim() === '');
             if (invalidVariant) {
-                alert('All variants must have a name (e.g. Size, Color).');
+                toast.warning('All variants must have a name (e.g. Size, Color).');
                 return;
             }
         }
@@ -271,7 +273,7 @@ const ProductDrawer = ({ isOpen, onClose, product, onSave, existingUnits, existi
                 }));
                 setTimeout(() => priceInputRef.current?.focus(), 100);
             } else {
-                alert('Product details not found.');
+                toast.warning('Product details not found.');
             }
         } catch (error) {
             console.error(error);

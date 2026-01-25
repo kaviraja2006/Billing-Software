@@ -1,6 +1,5 @@
 const path = require("path");
 
-// Load env FIRST (before passport / google strategy)
 require("dotenv").config({
   path: path.join(__dirname, "../.env"),
 });
@@ -10,13 +9,14 @@ const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const passport = require("passport");
+const session = require("express-session");
+const userContext = require("./middleware/userContext");
 
 const { notFound, errorHandler } = require("./middleware/errorMiddleware");
 
-// ✅ Register Google strategy (side-effect import)
+// Google OAuth only
 require("./config/googleStrategy");
 
-// Import Routes
 const authRoutes = require("./routes/authRoutes");
 const customerRoutes = require("./routes/customerRoutes");
 const productRoutes = require("./routes/productRoutes");
@@ -24,54 +24,81 @@ const invoiceRoutes = require("./routes/invoiceRoutes");
 const expenseRoutes = require("./routes/expenseRoutes");
 const reportRoutes = require("./routes/reportRoutes");
 const settingsRoutes = require("./routes/settingsRoutes");
+const analyticsRoutes = require("./routes/analyticsRoutes");
+const backupRoutes = require("./routes/backupRoutes");
+const { protect } = require("./middleware/authMiddleware");
 
 const app = express();
 
-// Initialize Passport
-app.use(passport.initialize());
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || "electron-local-secret",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      secure: false, // Electron = localhost
+      sameSite: "lax",
+    },
+  })
+);
 
-// Middleware
+app.use(passport.initialize());
+app.use(passport.session());
+app.use(passport.initialize());
+app.use(passport.session());
+// app.use(userContext); // ❌ REMOVED: This blocks /auth routes!
+
 app.use(
   cors({
     origin: [
       "http://localhost:5173",
       "http://localhost:5000",
-      "https://zilling.netlify.app",
-      "https://billing-software-o1qb.onrender.com",
+      "http://localhost:5005",
       /^https:\/\/.*\.vercel\.app$/,
+      "null" // Allow file:// protocol for admin dashboard
     ],
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
     credentials: true,
-    optionsSuccessStatus: 200,
   })
 );
 
 app.use(helmet());
 app.use(express.json());
 
-// Serve uploads
-app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+// Serve admin dashboard as static files (eliminates CORS issues)
+app.use('/admin', express.static(path.join(__dirname, '../../admin-dashboard')));
 
 if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
 }
 
-// Routes
-app.get("/", (req, res) => {
+app.get("/", (_req, res) => {
   res.send("API is running...");
 });
 
-app.use("/auth", authRoutes);
-app.use("/customers", customerRoutes);
-app.use("/products", productRoutes);
-app.use("/invoices", invoiceRoutes);
-app.use("/expenses", expenseRoutes);
-app.use("/reports", reportRoutes);
-app.use("/settings", settingsRoutes);
+app.use("/auth", authRoutes); // ✅ Public access allowed
 
-// Error Handling
+// Protect these routes with JWT authentication + userContext
+app.use("/customers", protect, userContext, customerRoutes);
+app.use("/products", protect, userContext, productRoutes);
+app.use("/invoices", protect, userContext, invoiceRoutes);
+app.use("/expenses", protect, userContext, expenseRoutes);
+app.use("/reports", protect, userContext, reportRoutes);
+app.use("/settings", protect, userContext, settingsRoutes);
+app.use("/backup", protect, userContext, backupRoutes);
+
+// Analytics routes (public ping endpoint + admin-only endpoints)
+app.use("/api/analytics", analyticsRoutes);
+
 app.use(notFound);
 app.use(errorHandler);
+
+// Initialize analytics database
+const analyticsDB = require('./db/analyticsDb');
+analyticsDB.initialize().then(() => {
+  console.log('Analytics database initialized');
+}).catch((err) => {
+  console.error('Failed to initialize analytics database:', err);
+});
 
 module.exports = app;
