@@ -1,15 +1,22 @@
 const express = require("express");
 const passport = require("passport");
-const generateToken = require("../utils/generateToken");
+const generateToken = require("../utils/generateToken"); // Keep this as it's used in /google/callback
 const { protect } = require("../middleware/authMiddleware");
+const { logoutUser } = require("../controllers/authController");
 
 const router = express.Router();
 
-// Start Google OAuth (Basic Login)
+// Start Google OAuth (includes Drive access)
 router.get(
   "/google",
   passport.authenticate("google", {
-    scope: ["profile", "email"],
+    scope: [
+      "profile",
+      "email",
+      "https://www.googleapis.com/auth/drive.file"
+    ],
+    accessType: "offline",
+    prompt: "consent", // Force consent to get fresh refresh token
     session: false,
   })
 );
@@ -18,10 +25,13 @@ router.get(
 router.get(
   "/google/drive",
   passport.authenticate("google", {
-    scope: ["profile", "email", "https://www.googleapis.com/auth/drive.file"],
-    session: false,
-    accessType: 'offline', // Request refresh token
-    prompt: 'consent' // Force consent
+    scope: [
+      "profile",
+      "email",
+      "https://www.googleapis.com/auth/drive.file"
+    ],
+    accessType: "offline", // Request refresh token
+    prompt: "consent" // Force consent screen to get fresh refresh token
   })
 );
 
@@ -40,13 +50,14 @@ router.get(
       }
 
       // ✅ CREATE JWT
-      const token = generateToken({
+      const tokenPayload = {
         name: user.name,
         email: user.email,
-        googleSub: user.googleSub,
-      });
+        googleSub: String(user.googleSub), // Ensure string
+      };
+      const token = generateToken(tokenPayload);
 
-      console.log("✅ Auth Success, Redirecting to billing://");
+      console.log("✅ Auth Success. Generated Token for:", tokenPayload.googleSub);
 
       // Serve a page that redirects and attempts to close itself
       const html = `
@@ -89,11 +100,9 @@ router.get("/me", protect, (req, res) => {
   });
 });
 
-// Logout endpoint
-router.post("/logout", (req, res) => {
-  // Since we're using JWT, logout is handled client-side by removing the token
-  // But we provide this endpoint for consistency
-  res.json({ message: "Logged out successfully" });
-});
+// @desc    Logout user / clear cookie
+// @route   POST /auth/logout
+// @access  Public
+router.get("/logout", logoutUser);
 
 module.exports = router;

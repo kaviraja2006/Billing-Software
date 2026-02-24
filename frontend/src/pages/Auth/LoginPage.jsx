@@ -65,8 +65,9 @@ const LoginPage = () => {
           onClick={() => {
             try {
               loginWithGoogle();
-            } catch {
-              setError("Unable to start Google login.");
+            } catch (err) {
+              console.error("Google Login Error:", err);
+              setError(err.message || "Unable to start Google login.");
             }
           }}
           className="w-full h-10 rounded-md bg-blue-600 text-white font-medium hover:bg-blue-700 transition shadow-sm"

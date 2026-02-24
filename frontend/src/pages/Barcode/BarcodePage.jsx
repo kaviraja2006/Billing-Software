@@ -10,18 +10,13 @@ import { useProducts } from '../../context/ProductContext';
 const BarcodeGeneratorPage = () => {
     const { products } = useProducts();
     const [inputValue, setInputValue] = useState('PROD-101');
-    const [barcodeValue, setBarcodeValue] = useState('PROD-101');
+    // derived state for barcode value to ensure live update, or just use inputValue directly
     const [barcodeFormat, setBarcodeFormat] = useState('CODE128');
-
-    const generateBarcode = () => {
-        setBarcodeValue(inputValue);
-    };
 
     const handleProductSelect = (e) => {
         const prod = products.find(p => p.id === e.target.value);
         if (prod) {
             setInputValue(prod.barcode || prod.id); // Use barcode if exists, else ID
-            setBarcodeValue(prod.barcode || prod.id);
             setBarcodeFormat(prod.barcodeType || 'CODE128');
         }
     };
@@ -82,9 +77,9 @@ const BarcodeGeneratorPage = () => {
                             value={barcodeFormat}
                             onChange={(e) => setBarcodeFormat(e.target.value)}
                         >
-                            <option value="CODE128">CODE-128</option>
-                            <option value="EAN13">EAN-13</option>
-                            <option value="UPC">UPC-A</option>
+                            <option value="CODE128">CODE-128 (Standard)</option>
+                            <option value="EAN13">EAN-13 (Retail)</option>
+                            <option value="UPC">UPC-A (US Retail)</option>
                         </select>
                     </div>
 
@@ -95,8 +90,9 @@ const BarcodeGeneratorPage = () => {
                             placeholder="Enter Product Code / SKU"
                             className="text-lg font-mono uppercase"
                         />
-                        <Button onClick={generateBarcode} variant="primary">Generate</Button>
+                        {/* Generate button removed as it is now live-preview */}
                     </div>
+                    <p className="text-xs text-slate-400">Barcode updates automatically as you type.</p>
                 </div>
 
                 <div className="space-y-6">
@@ -111,12 +107,12 @@ const BarcodeGeneratorPage = () => {
                                 minHeight: '150px'
                             }}
                         >
-                            <Barcode value={barcodeValue} format={barcodeFormat} width={2} height={100} fontSize={16} />
+                            <Barcode value={inputValue || ' '} format={barcodeFormat} width={2} height={100} fontSize={16} />
                         </div>
                     </div>
 
                     <div className="flex justify-center gap-4">
-                        <Button variant="outline" onClick={() => navigator.clipboard.writeText(barcodeValue)}>
+                        <Button variant="outline" onClick={() => navigator.clipboard.writeText(inputValue)}>
                             <Copy className="mr-2 h-4 w-4" /> Copy Code
                         </Button>
                         <Button onClick={handlePrint}>

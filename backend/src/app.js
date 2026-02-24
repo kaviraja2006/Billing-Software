@@ -1,9 +1,5 @@
 const path = require("path");
 
-require("dotenv").config({
-  path: path.join(__dirname, "../.env"),
-});
-
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
@@ -24,8 +20,9 @@ const invoiceRoutes = require("./routes/invoiceRoutes");
 const expenseRoutes = require("./routes/expenseRoutes");
 const reportRoutes = require("./routes/reportRoutes");
 const settingsRoutes = require("./routes/settingsRoutes");
-const analyticsRoutes = require("./routes/analyticsRoutes");
+
 const backupRoutes = require("./routes/backupRoutes");
+const companyProfileRoutes = require("./routes/companyProfileRoutes");
 const { protect } = require("./middleware/authMiddleware");
 
 const app = express();
@@ -45,8 +42,6 @@ app.use(
 
 app.use(passport.initialize());
 app.use(passport.session());
-app.use(passport.initialize());
-app.use(passport.session());
 // app.use(userContext); // ❌ REMOVED: This blocks /auth routes!
 
 app.use(
@@ -55,6 +50,7 @@ app.use(
       "http://localhost:5173",
       "http://localhost:5000",
       "http://localhost:5005",
+      "http://127.0.0.1:5500",
       /^https:\/\/.*\.vercel\.app$/,
       "null" // Allow file:// protocol for admin dashboard
     ],
@@ -63,10 +59,12 @@ app.use(
 );
 
 app.use(helmet());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Serve admin dashboard as static files (eliminates CORS issues)
-app.use('/admin', express.static(path.join(__dirname, '../../admin-dashboard')));
+// Serve admin dashboard as static files (eliminates CORS issues)
+// Removed: app.use('/admin', express.static(path.join(__dirname, '../../admin-dashboard')));
 
 if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
@@ -74,6 +72,14 @@ if (process.env.NODE_ENV === "development") {
 
 app.get("/", (_req, res) => {
   res.send("API is running...");
+});
+
+app.get("/health", (_req, res) => {
+  res.json({
+    status: "OK",
+    timestamp: new Date().toISOString(),
+    env: process.env.NODE_ENV || "development"
+  });
 });
 
 app.use("/auth", authRoutes); // ✅ Public access allowed
@@ -86,19 +92,9 @@ app.use("/expenses", protect, userContext, expenseRoutes);
 app.use("/reports", protect, userContext, reportRoutes);
 app.use("/settings", protect, userContext, settingsRoutes);
 app.use("/backup", protect, userContext, backupRoutes);
-
-// Analytics routes (public ping endpoint + admin-only endpoints)
-app.use("/api/analytics", analyticsRoutes);
+app.use("/api/company-profile", protect, companyProfileRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
-
-// Initialize analytics database
-const analyticsDB = require('./db/analyticsDb');
-analyticsDB.initialize().then(() => {
-  console.log('Analytics database initialized');
-}).catch((err) => {
-  console.error('Failed to initialize analytics database:', err);
-});
 
 module.exports = app;

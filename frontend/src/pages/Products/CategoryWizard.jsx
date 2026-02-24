@@ -3,6 +3,7 @@ import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Search, Tag, Check } from 'lucide-react';
+import { isSearchMatch } from '../../utils/searchUtils';
 
 const CategoryWizard = ({ isOpen, onClose, categories, onSelectCategory, title = "Select Category" }) => {
     const [searchQuery, setSearchQuery] = useState('');
@@ -16,9 +17,8 @@ const CategoryWizard = ({ isOpen, onClose, categories, onSelectCategory, title =
     }, [isOpen, categories]);
 
     useEffect(() => {
-        const query = searchQuery.toLowerCase();
         setFilteredCategories(
-            categories.filter(cat => cat.toLowerCase().includes(query))
+            categories.filter(cat => isSearchMatch(cat, searchQuery))
         );
     }, [searchQuery, categories]);
 

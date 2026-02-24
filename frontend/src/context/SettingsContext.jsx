@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback, useMemo } from 'react';
 import services from '../services/api';
 import { useAuth } from './AuthContext';
 
@@ -60,6 +60,12 @@ export const SettingsProvider = ({ children }) => {
             printLanguage: 'en',
             hsnCode: ''
         },
+        print: {
+            showPreview: true,
+            silentPrint: false,
+            margins: { top: 0, right: 0, bottom: 0, left: 0 },
+            printerName: ''
+        },
         store: {
             name: 'My Billing Co.',
             legalName: '',
@@ -80,34 +86,62 @@ export const SettingsProvider = ({ children }) => {
             logo: true,
             gstin: '',
             fssai: ''
-        }
+        },
+        billing: {
+            requireCustomerMobile: true,
+            allowAnonymousBilling: false,
+            autoSendInvoice: false
+        },
+        user: {
+            fullName: '',
+            mobile: '',
+            email: '',
+            role: 'Owner',
+            consent: {
+                analytics: true,
+                contact: true
+            }
+        },
+        backup: {
+            enabled: false,
+            frequency: 'Daily',
+            time: '02:00'
+        },
+        onboardingCompletedAt: null
     };
 
     const [settings, setSettings] = useState(defaultSettings);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Only fetch if user is authenticated and auth is not loading
-        if (authLoading || !user) {
+        // 1. If auth is loading, keep settings loading (don't set to false yet)
+        if (authLoading) return;
+
+        // 2. Auth done. If no user, reset to defaults and stop loading.
+        if (!user) {
+            setSettings(defaultSettings);
             setLoading(false);
-            if (!user) {
-                setSettings(defaultSettings);
-            }
             return;
         }
+
+        // 3. Auth done, User exists. Start loading settings.
+        setLoading(true);
 
         const fetchSettings = async () => {
             try {
                 const response = await services.settings.getSettings();
 
-                // Deep merge with defaults to ensure all fields exist (even if backend is partial)
+                // Deep merge with defaults
                 setSettings(prev => ({
                     ...prev,
                     ...response.data,
                     store: { ...prev.store, ...response.data.store },
                     tax: { ...prev.tax, ...response.data.tax },
                     invoice: { ...prev.invoice, ...response.data.invoice },
-                    defaults: { ...prev.defaults, ...response.data.defaults }
+                    defaults: { ...prev.defaults, ...response.data.defaults },
+                    billing: { ...prev.billing, ...response.data.billing },
+                    user: { ...prev.user, ...response.data.user },
+                    onboardingCompletedAt: response.data.onboardingCompletedAt || prev.onboardingCompletedAt
                 }));
             } catch (error) {
                 console.error("Failed to fetch settings", error);
@@ -118,44 +152,57 @@ export const SettingsProvider = ({ children }) => {
         fetchSettings();
     }, [user, authLoading]);
 
-    const saveSettings = async (newSettings) => {
+    const saveSettings = useCallback(async (newSettings) => {
+        // Propagate error to caller
+        await services.settings.updateSettings(newSettings);
+        setSettings(newSettings);
+    }, []);
+
+    const updateSettings = useCallback((section, data) => {
+        setSettings(prev => ({
+            ...prev,
+            [section]: {
+                ...prev[section],
+                ...data
+            }
+        }));
+    }, []);
+
+    const refreshSettings = useCallback(async () => {
+        setLoading(true);
         try {
-            await services.settings.updateSettings(newSettings);
+            const response = await services.settings.getSettings();
+            setSettings(prev => ({
+                ...prev,
+                ...response.data,
+                store: { ...prev.store, ...response.data.store },
+                tax: { ...prev.tax, ...response.data.tax },
+                invoice: { ...prev.invoice, ...response.data.invoice },
+                defaults: { ...prev.defaults, ...response.data.defaults },
+                billing: { ...prev.billing, ...response.data.billing },
+                user: { ...prev.user, ...response.data.user },
+                onboardingCompletedAt: response.data.onboardingCompletedAt || prev.onboardingCompletedAt
+            }));
         } catch (error) {
-            console.error("Failed to save settings", error);
+            console.error("Failed to refresh settings", error);
+        } finally {
+            setLoading(false);
         }
-    };
+    }, []);
 
-    const updateSettings = (section, data) => {
-        setSettings(prev => {
-            const next = {
-                ...prev,
-                [section]: {
-                    ...prev[section],
-                    ...data
-                }
-            };
-            return next;
-        });
-    };
+    const updateTaxSlab = useCallback((id, updates) => {
+        setSettings(prev => ({
+            ...prev,
+            tax: {
+                ...prev.tax,
+                slabs: prev.tax.slabs.map(slab =>
+                    slab.id === id ? { ...slab, ...updates } : slab
+                )
+            }
+        }));
+    }, []);
 
-    const updateTaxSlab = (id, updates) => {
-        setSettings(prev => {
-            const next = {
-                ...prev,
-                tax: {
-                    ...prev.tax,
-                    slabs: prev.tax.slabs.map(slab =>
-                        slab.id === id ? { ...slab, ...updates } : slab
-                    )
-                }
-            };
-            // saveSettings(next); // Removed auto-save
-            return next;
-        });
-    };
-
-    const addTaxSlab = (newSlab) => {
+    const addTaxSlab = useCallback((newSlab) => {
         setSettings(prev => {
             const next = {
                 ...prev,
@@ -167,35 +214,38 @@ export const SettingsProvider = ({ children }) => {
             saveSettings(next);
             return next;
         });
-    };
+    }, [saveSettings]);
 
-    const resetSlabs = () => {
+    const resetSlabs = useCallback(() => {
         setSettings(prev => {
             const next = {
                 ...prev,
                 tax: {
                     ...prev.tax,
-                    slabs: defaultSettings.tax.slabs
+                    slabs: []
                 }
             };
             saveSettings(next);
             return next;
         });
-    };
+    }, [saveSettings]);
+
+    const value = useMemo(() => ({
+        settings,
+        updateSettings,
+        saveSettings,
+        refreshSettings,
+        updateTaxSlab,
+        addTaxSlab,
+        resetSlabs
+    }), [settings, updateSettings, saveSettings, refreshSettings, updateTaxSlab, addTaxSlab, resetSlabs]);
 
     if (loading) {
         return <div className="p-10 text-center text-slate-500">Loading settings...</div>;
     }
 
     return (
-        <SettingsContext.Provider value={{
-            settings,
-            updateSettings,
-            saveSettings, // Exposed
-            updateTaxSlab,
-            addTaxSlab,
-            resetSlabs
-        }}>
+        <SettingsContext.Provider value={value}>
             {children}
         </SettingsContext.Provider>
     );

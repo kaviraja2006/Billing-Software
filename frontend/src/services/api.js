@@ -2,10 +2,10 @@ import axios from 'axios';
 
 // Vite uses import.meta.env for environment variables.
 // Variables must start with VITE_ to be exposed to the client.
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
 const api = axios.create({
-    baseURL: "http://127.0.0.1:5000",
+    baseURL: "http://localhost:5000",
     headers: {
         'Content-Type': 'application/json',
     },
@@ -24,22 +24,30 @@ api.interceptors.request.use(
     (error) => Promise.reject(error)
 );
 
-// Response interceptor for handling errors
+// Response interceptor to handle errors
 api.interceptors.response.use(
     (response) => response,
     (error) => {
-        if (error.response?.status === 401) {
-            // Clear invalid token
-            localStorage.removeItem('token');
+        // Suppress 404 errors for customer mobile lookups (expected for new customers)
+        if (error.response?.status === 404 && error.config?.url?.includes('/customers/mobile/')) {
             return Promise.reject(error);
         }
-        console.error("API error:", error);
+
+        // Log other API errors
+        if (error.response) {
+            console.error('API error:', error.response.data);
+        } else if (error.request) {
+            console.error('Network error:', error.message);
+        } else {
+            console.error('Request error:', error.message);
+        }
         return Promise.reject(error);
     }
 );
 
 // Environment Detection
-const isElectron = window.electron !== undefined;
+const isElectron = false; // Force HTTP mode even in Electron to communicate with local backend
+// const isElectron = window.electron !== undefined;
 
 // Helper to mimic Axios Response for Electron IPC
 const ipcResponse = async (promise) => {
@@ -81,7 +89,9 @@ const services = {
     customers: {
         getAll: () => isElectron ? ipcResponse(window.electron.customer.findAll()) : api.get('/customers'),
         getById: (id) => isElectron ? ipcResponse(window.electron.customer.findById(id)) : api.get(`/customers/${id}`),
+        getByMobile: (mobile) => isElectron ? ipcResponse(window.electron.customer.findByMobile(mobile)) : api.get(`/customers/mobile/${mobile}`),
         create: (data) => isElectron ? ipcResponse(window.electron.customer.create(data)) : api.post('/customers', data),
+        findOrCreate: (data) => isElectron ? ipcResponse(window.electron.customer.findOrCreate(data)) : api.post('/customers/find-or-create', data),
         update: (id, data) => isElectron ? ipcResponse(window.electron.customer.update(id, data)) : api.put(`/customers/${id}`, data),
         delete: (id) => isElectron ? ipcResponse(window.electron.customer.delete(id)) : api.delete(`/customers/${id}`),
         searchDuplicates: (query) => isElectron ? Promise.resolve({ data: [] }) : api.get('/customers/search-duplicates', { params: { query } }),
@@ -103,7 +113,21 @@ const services = {
         getById: (id) => isElectron ? ipcResponse(window.electron.invoice.findById(id)) : api.get(`/invoices/${id}`),
         update: (id, data) => isElectron ? ipcResponse(window.electron.invoice.update(id, data)) : api.put(`/invoices/${id}`, data),
         delete: (id) => isElectron ? ipcResponse(window.electron.invoice.delete(id)) : api.delete(`/invoices/${id}`),
-        bulkDelete: (ids) => isElectron ? Promise.resolve({ data: {} }) : api.post('/invoices/bulk-delete', { ids }),
+        bulkDelete: (ids) => isElectron ?
+            Promise.all(ids.map(id => window.electron.invoice.delete(id))).then(() => ({ data: { success: true } })) :
+            api.post('/invoices/bulk-delete', { ids }),
+        uncancel: (id) => isElectron ?
+            Promise.resolve({ data: { success: true } }) : // Mocking for now if electron not updated
+            api.post(`/invoices/${id}/uncancel`),
+        bulkUncancel: (ids) => isElectron ?
+            Promise.resolve({ data: { success: true } }) :
+            api.post('/invoices/bulk-uncancel', { ids }),
+        permanentDelete: (id) => isElectron ?
+            Promise.resolve({ data: { success: true } }) :
+            api.delete(`/invoices/${id}/permanent`),
+        bulkPermanentDelete: (ids) => isElectron ?
+            Promise.resolve({ data: { success: true } }) :
+            api.post('/invoices/bulk-permanent-delete', { ids }),
     },
     expenses: {
         getAll: () => api.get('/expenses'), // Not implementing offline expenses yet
@@ -122,7 +146,19 @@ const services = {
         },
     },
     reports: {
-        getDashboardStats: (params) => isElectron ? Promise.resolve({ data: { totalSales: 0, totalInvoices: 0 } }) : api.get('/reports/dashboard', { params }),
+        getDashboardStats: (params) => isElectron ? Promise.resolve({
+            data: {
+                sales: { value: 0, change: 0 },
+                orders: { value: 0, change: 0 },
+                expenses: { value: 0, change: 0 },
+                netProfit: { value: 0, change: 0 },
+                margins: {
+                    gross: { value: 0, change: 0 },
+                    net: { value: 0, change: 0 }
+                },
+                aov: { value: 0, change: 0 }
+            }
+        }) : api.get('/reports/dashboard', { params }),
         getFinancials: (params) => api.get('/reports/financials', { params }),
         getSalesTrend: (params) => api.get('/reports/sales-trend', { params }),
         getPaymentMethodStats: (params) => api.get('/reports/payment-methods', { params }),
@@ -136,6 +172,11 @@ const services = {
     backup: {
         trigger: () => api.post('/backup/trigger'),
         getStatus: () => api.get('/backup/status'),
+    },
+    companyProfile: {
+        save: (data) => api.post('/api/company-profile', data),
+        get: (userId) => api.get(`/api/company-profile/${userId}`),
+        getAll: () => api.get('/api/company-profile'),
     },
 };
 

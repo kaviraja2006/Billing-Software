@@ -60,7 +60,35 @@ class InvoiceRepository extends Repository {
             params.push(query.userId);
         }
 
-        // Add more filters as needed
+        if (query.status) {
+            const statuses = query.status.split(',');
+            conditions.push(`status IN (${statuses.map(() => '?').join(',')})`);
+            params.push(...statuses);
+        }
+
+        if (query.startDate && query.endDate) {
+            conditions.push('date BETWEEN ? AND ?');
+            params.push(query.startDate, query.endDate);
+        }
+
+        if (query.search) {
+            conditions.push('(invoiceNumber LIKE ? OR customerName LIKE ?)');
+            params.push(`%${query.search}%`, `%${query.search}%`);
+        }
+
+        if (query.paymentMethod && query.paymentMethod !== 'All') {
+            conditions.push('paymentMethod = ?');
+            params.push(query.paymentMethod);
+        }
+
+        if (query.minAmount) {
+            conditions.push('total >= ?');
+            params.push(query.minAmount);
+        }
+        if (query.maxAmount) {
+            conditions.push('total <= ?');
+            params.push(query.maxAmount);
+        }
 
         if (conditions.length > 0) {
             sql += ' WHERE ' + conditions.join(' AND ');
@@ -68,8 +96,40 @@ class InvoiceRepository extends Repository {
 
         sql += ' ORDER BY createdAt DESC';
 
-        const invoices = this.db.prepare(sql).all(...params);
-        return invoices.map(this._mapDoc);
+        // Pagination
+        if (query.page && query.limit) {
+            const limit = parseInt(query.limit);
+            const offset = (parseInt(query.page) - 1) * limit;
+            sql += ' LIMIT ? OFFSET ?';
+            params.push(limit, offset);
+        }
+
+        const stmt = this.db.prepare(sql);
+        const invoices = stmt.all(...params);
+
+        // Return structured data for pagination support if needed, but for now matching existing return
+        // The frontend expects { data: [...], page, pages, total } usually, but looking at InvoicesPage.jsx:
+        // setInvoices(invRes.data.data.map...
+        // so the response here should probably match that structure or the ipcHandler should wrap it.
+        // IPC handler just returns invoiceRepo.findAll(query).
+        // Let's check what ipcResponse does. It wraps result in { data: result, ... }.
+        // So invoiceRepo.findAll needs to return { data: invoices, total: count, page: ..., pages: ... }
+
+        // We need the total count for pagination
+        let countSql = 'SELECT COUNT(*) as count FROM invoices';
+        if (conditions.length > 0) {
+            countSql += ' WHERE ' + conditions.join(' AND ');
+        }
+        // distinct params for count (excluding limit/offset)
+        const countParams = params.slice(0, params.length - (query.page ? 2 : 0));
+        const total = this.db.prepare(countSql).get(...countParams).count;
+
+        return {
+            data: invoices.map(this._mapDoc),
+            total,
+            page: parseInt(query.page) || 1,
+            pages: Math.ceil(total / (parseInt(query.limit) || 50))
+        };
     }
 
     findById(id) {
@@ -100,7 +160,8 @@ class InvoiceRepository extends Repository {
     }
 
     delete(id) {
-        return this.db.prepare('DELETE FROM invoices WHERE _id = ?').run(id);
+        // Soft delete: Mark as Cancelled instead of removing
+        return this.db.prepare("UPDATE invoices SET status = 'Cancelled', updatedAt = ? WHERE _id = ?").run(new Date().toISOString(), id);
     }
 
     _mapDoc(doc) {

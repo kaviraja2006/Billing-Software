@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Filter, X, Search } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { isSearchMatch } from '../../utils/searchUtils';
 import './CategoryFilter.css';
 
 const CategoryFilter = ({ expenses, onCategoryChange, value }) => {
@@ -15,7 +16,7 @@ const CategoryFilter = ({ expenses, onCategoryChange, value }) => {
 
     // Filter categories based on search term
     const filteredCategories = allCategories.filter(category =>
-        category.toLowerCase().includes(searchTerm.toLowerCase())
+        isSearchMatch(category, searchTerm)
     );
 
     // Close dropdown when clicking outside

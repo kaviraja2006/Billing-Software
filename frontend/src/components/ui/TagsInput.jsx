@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { X } from 'lucide-react';
+import { isSearchMatch } from '../../utils/searchUtils';
 
 export const TagsInput = ({ value = [], onChange, suggestions = [], placeholder = 'Add tags...' }) => {
     const [inputValue, setInputValue] = useState('');
@@ -7,7 +8,7 @@ export const TagsInput = ({ value = [], onChange, suggestions = [], placeholder 
     const inputRef = useRef(null);
 
     const filteredSuggestions = suggestions.filter(
-        s => s.toLowerCase().includes(inputValue.toLowerCase()) && !value.includes(s)
+        s => isSearchMatch(s, inputValue) && !value.includes(s)
     );
 
     const addTag = (tag) => {

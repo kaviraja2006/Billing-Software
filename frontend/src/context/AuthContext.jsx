@@ -18,18 +18,24 @@ export const AuthProvider = ({ children }) => {
   // ✅ Check auth state on app load with Retry Logic
   useEffect(() => {
     let retries = 0;
-    const maxRetries = 10; // 5 seconds (500ms * 10)
+    const maxRetries = 50; // 15 seconds (300ms * 50) - Give backend ample time to start
 
     const checkAuth = async () => {
       try {
         const res = await services.auth.getCurrentUser();
         setUser(res.data);
         setAuthStatus("authenticated");
+
+        // Send token to Electron for auto-backup timer on initial load
+        const token = localStorage.getItem('token');
+        if (token && window.electron?.setToken) {
+          window.electron.setToken(token);
+        }
       } catch (err) {
         if (err.code === "ERR_NETWORK" && retries < maxRetries) {
           retries++;
-          // Silently retry after delay
-          setTimeout(checkAuth, 500);
+          // Silently retry after delay (faster retries = more responsive)
+          setTimeout(checkAuth, 300);
           return;
         }
 
@@ -58,6 +64,11 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem("token"); // ✅ Clear token from localStorage
       setUser(null);
       setAuthStatus("unauthenticated");
+
+      // Notify Electron to stop auto-backup timer
+      if (window.electron?.setToken) {
+        window.electron.setToken(null);
+      }
     }
   };
 
@@ -70,12 +81,9 @@ export const AuthProvider = ({ children }) => {
       setUser(userData);
       setAuthStatus("authenticated");
 
-      // Send user info to analytics (Electron only)
-      if (window.electron && window.electron.sendUserInfo) {
-        window.electron.sendUserInfo({
-          name: userData.name || userData.displayName,
-          email: userData.email
-        });
+      // Send token to Electron for auto-backup timer
+      if (window.electron?.setToken) {
+        window.electron.setToken(token);
       }
     } catch (err) {
       console.error("Failed to authenticate with token:", err);
@@ -106,7 +114,9 @@ export const AuthProvider = ({ children }) => {
         user,
         authStatus,
         logout,
-        loginSuccess, // ✅ EXPOSED
+        loginSuccess,
+        loginWithGoogle, // ✅ FIXED: Added missing method
+        setTokenAndAuthenticate, // ✅ FIXED: Added missing method
       }}
     >
       {children}

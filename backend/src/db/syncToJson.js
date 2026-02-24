@@ -53,10 +53,23 @@ function syncTableToJson({ db, table, userBaseDir, map, userId }) {
     }
 
     const timeoutId = setTimeout(() => {
-      performBackup(userId, userBaseDir).then(res => {
-        if (res.success) console.log("☁️  Auto-Backup Success");
-        else console.log("⚠️ Auto-Backup Skipped/Failed (Auth likely needed)");
-      });
+      // 🛡️ Check Settings before Backup
+      try {
+        const settingsRow = db.prepare(`SELECT data FROM settings WHERE id = 'singleton'`).get();
+        const settings = settingsRow ? JSON.parse(settingsRow.data) : {};
+
+        if (!settings.backup?.enabled) {
+          console.log("☁️  Auto-Backup Skipped: Feature Disabled in Settings");
+          return;
+        }
+
+        performBackup(userId, userBaseDir).then(res => {
+          if (res.success) console.log("☁️  Auto-Backup Success");
+          else console.log("⚠️ Auto-Backup Skipped/Failed (Auth likely needed)");
+        });
+      } catch (err) {
+        console.error("Backup trigger check failed:", err);
+      }
       debounceMap.delete(userId);
     }, 30000); // 30 seconds debounce
 
