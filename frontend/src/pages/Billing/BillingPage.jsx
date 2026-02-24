@@ -1,393 +1,603 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { printReceipt } from '../../utils/printerService';
+import { syncService } from '../../services/syncService';
+import React, { useState, useEffect, useRef, useMemo, useLayoutEffect, useCallback, useDeferredValue } from 'react';
+import { calculateTotals } from '../../utils/billingUtils';
+import { printReceipt } from '../../utils/printReceipt';
+import { normalizeSearchText } from '../../utils/searchUtils';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Search, X, Settings, Minus, Plus } from 'lucide-react';
+import { Search, X, Settings, Minus, Plus, RefreshCcw } from 'lucide-react';
 import { useTransactions } from '../../context/TransactionContext';
 import { useProducts } from '../../context/ProductContext';
+import { useCustomers } from '../../context/CustomerContext';
+import { useToast } from '../../context/ToastContext';
 import BillingGrid from './components/BillingGrid';
-import BillingSidebar from './components/BillingSidebar';
+import BillingSidebar from './components/Billingsidebar';
 import BottomFunctionBar from './components/BottomFunctionBar';
 import useKeyboardShortcuts from '../../hooks/useKeyboardShortcuts';
-import { DiscountModal, RemarksModal, AdditionalChargesModal, LoyaltyPointsModal } from './components/ActionModals';
+import InvoicePreviewModal from '../Invoices/InvoicePreviewModal';
+import { DiscountModal } from './components/modals/DiscountModal';
+import { RemarksModal } from './components/modals/RemarksModal';
+import { AdditionalChargesModal } from './components/modals/AdditionalChargesModal';
+import { LoyaltyPointsModal } from './components/modals/LoyaltyPointsModal';
 import CustomerSearchModal from './components/CustomerSearchModal';
-import { useSettings } from '../../context/SettingsContext';
+import QuantityModal from './components/QuantityModal';
+import VariantSelectionModal from './components/VariantSelectionModal';
+import ConfirmationModal from '../../components/ui/ConfirmationModal';
+import UnitModal from './components/UnitModal';
+import PriceModal from './components/PriceModal';
 
+// Update: Add F5 shortcut
+import { useSettings } from '../../context/SettingsContext';
 
 const BillingPage = () => {
     const { addTransaction } = useTransactions();
-    const { products } = useProducts();
+    const { products, refreshProducts } = useProducts();
+    const { refreshCustomers, findOrCreateCustomer } = useCustomers();
     const { settings } = useSettings();
+    const { addToast } = useToast();
     const searchInputRef = useRef(null);
+    const suggestionsListRef = useRef(null);
+    const [isProcessing, setIsProcessing] = useState(false);
 
-    // --- State: Multi-Tab Support ---
-    const [activeBills, setActiveBills] = useState([
-        {
-            id: 1,
-            customer: null,
-            cart: [],
-            totals: { grossTotal: 0, itemDiscount: 0, subtotal: 0, tax: 0, discount: 0, additionalCharges: 0, roundOff: 0, total: 0 },
-            paymentMode: 'Cash',
-            amountReceived: 0,
-            remarks: '',
-            billDiscount: 0
-        }
-    ]);
-    const [activeBillId, setActiveBillId] = useState(1);
-    const [selectedItemId, setSelectedItemId] = useState(null);
-    const [modals, setModals] = useState({
-        itemDiscount: false,
-        billDiscount: false,
-        remarks: false,
-        additionalCharges: false,
-        loyaltyPoints: false,
-        customerSearch: false
+    // --- State ---
+    const [activeBills, setActiveBills] = useState(() => {
+        try {
+            const saved = sessionStorage.getItem('billing_activeBills');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+            }
+        } catch (error) { console.error(error); }
+        return [{ id: 1, customer: null, cart: [], totals: { grossTotal: 0, itemDiscount: 0, subtotal: 0, tax: 0, discount: 0, additionalCharges: 0, roundOff: 0, total: 0 }, gstSummary: {}, paymentMode: null, amountReceived: '', remarks: '', billDiscount: 0, additionalCharges: 0, loyaltyPointsDiscount: 0, status: 'Pending', taxType: 'Intra-State' }];
     });
+    const [activeBillId, setActiveBillId] = useState(() => {
+        try {
+            const saved = sessionStorage.getItem('billing_activeBillId');
+            if (saved) return parseInt(saved, 10);
+        } catch (error) { console.error(error); }
+        return 1;
+    });
+    const [selectedItemId, setSelectedItemId] = useState(null);
+    const [selectedItems, setSelectedItems] = useState([]);
+    const [modals, setModals] = useState({ itemDiscount: false, billDiscount: false, remarks: false, additionalCharges: false, loyaltyPoints: false, customerSearch: false, quantityChange: false, variantSelection: false, invoiceDelivery: false, unitChange: false, priceChange: false, previewModal: false });
+    const [previewInvoice, setPreviewInvoice] = useState(null);
+    const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
+    const [savedInvoiceData, setSavedInvoiceData] = useState(null);
+    const [selectedProductForVariant, setSelectedProductForVariant] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
-    const [focusIndex, setFocusIndex] = useState(-1); // For keyboard navigation in grid
-    const [mobileTab, setMobileTab] = useState('items'); // 'items' | 'payment'
+    const deferredSearchTerm = useDeferredValue(searchTerm);
+    const [searchActiveIndex, setSearchActiveIndex] = useState(-1);
+    const [focusIndex, setFocusIndex] = useState(-1);
+    const [mobileTab, setMobileTab] = useState('items');
 
-    // Helper: Get Current Bill
+    useEffect(() => { try { sessionStorage.setItem('billing_activeBills', JSON.stringify(activeBills)); } catch (e) { } }, [activeBills]);
+    useEffect(() => { try { sessionStorage.setItem('billing_activeBillId', activeBillId.toString()); } catch (e) { } }, [activeBillId]);
+    
+    // Handle Alt+B for printing in preview modal
+    useEffect(() => {
+        const handleAltB = (e) => {
+            if ((e.altKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+                e.preventDefault();
+                // Find and click the print button in the preview modal
+                const printButton = document.querySelector('[data-print-button]');
+                if (printButton) {
+                    printButton.click();
+                }
+            }
+            // Enter key to confirm save in preview modal
+            if (e.key === 'Enter') {
+                const confirmButton = document.querySelector('[data-confirm-button]');
+                if (confirmButton) {
+                    confirmButton.click();
+                }
+            }
+        };
+        window.addEventListener('keydown', handleAltB);
+        return () => window.removeEventListener('keydown', handleAltB);
+    }, []);
+
     const currentBill = activeBills.find(b => b.id === activeBillId) || activeBills[0];
 
-    // --- Actions: Tabs ---
+    // Safety check to prevent crashes if state is invalid
+    if (!currentBill) {
+        return <div className="flex items-center justify-center h-full">Loading Billing...</div>;
+    }
+
+    // --- Derived State (Memoized) ---
+    const derivedBillingData = useMemo(() => {
+        return calculateTotals(
+            currentBill.cart,
+            currentBill.billDiscount || 0,
+            currentBill.additionalCharges || 0,
+            currentBill.loyaltyPointsDiscount || 0,
+            currentBill.taxType,
+            settings
+        );
+    }, [
+        currentBill.cart,
+        currentBill.billDiscount,
+        currentBill.additionalCharges,
+        currentBill.loyaltyPointsDiscount,
+        currentBill.taxType,
+        settings
+    ]);
+
+    const { totals, gstSummary, enrichedCart } = derivedBillingData;
+
     const addNewBill = () => {
         const newId = Math.max(...activeBills.map(b => b.id)) + 1;
-        const newBill = {
-            id: newId,
-            customer: null,
-            cart: [],
-            totals: { grossTotal: 0, itemDiscount: 0, subtotal: 0, tax: 0, discount: 0, additionalCharges: 0, roundOff: 0, total: 0 },
-            paymentMode: 'Cash',
-            amountReceived: 0,
-            remarks: '',
-            billDiscount: 0,
-            additionalCharges: 0,
-            loyaltyPointsDiscount: 0,
-            status: 'Paid' // Default status
-        };
-        setActiveBills([...activeBills, newBill]);
+        setActiveBills([...activeBills, { id: newId, customer: null, cart: [], totals: { grossTotal: 0, itemDiscount: 0, subtotal: 0, tax: 0, discount: 0, additionalCharges: 0, roundOff: 0, total: 0 }, gstSummary: {}, paymentMode: null, amountReceived: '', remarks: '', billDiscount: 0, additionalCharges: 0, loyaltyPointsDiscount: 0, status: 'Pending', taxType: 'Intra-State' }]);
         setActiveBillId(newId);
         setSelectedItemId(null);
     };
 
     const closeBill = (id) => {
         if (activeBills.length === 1) {
-            // Don't close the last tab, just reset it
-            const freshBill = {
-                id: 1,
-                customer: null,
-                cart: [],
-                totals: { grossTotal: 0, itemDiscount: 0, subtotal: 0, tax: 0, discount: 0, additionalCharges: 0, roundOff: 0, total: 0 },
-                paymentMode: 'Cash',
-                amountReceived: 0,
-                remarks: '',
-                billDiscount: 0,
-                additionalCharges: 0,
-                loyaltyPointsDiscount: 0,
-                status: 'Paid'
-            };
-            setActiveBills([freshBill]);
+            setActiveBills([{ id: 1, customer: null, cart: [], totals: { grossTotal: 0, itemDiscount: 0, subtotal: 0, tax: 0, discount: 0, additionalCharges: 0, roundOff: 0, total: 0 }, gstSummary: {}, paymentMode: null, amountReceived: '', remarks: '', billDiscount: 0, additionalCharges: 0, loyaltyPointsDiscount: 0, status: 'Pending', taxType: 'Intra-State' }]);
             setActiveBillId(1);
             setSelectedItemId(null);
             return;
         }
-
         const newBills = activeBills.filter(b => b.id !== id);
         setActiveBills(newBills);
-        if (id === activeBillId) {
-            setActiveBillId(newBills[newBills.length - 1].id);
+        if (id === activeBillId) setActiveBillId(newBills[newBills.length - 1].id);
+    };
+
+    const updateCurrentBill = useCallback((updates) => {
+        setActiveBills(prev => prev.map(bill => bill.id === activeBillId ? { ...bill, ...updates } : bill));
+    }, [activeBillId]);
+
+    const [triggerFocus, setTriggerFocus] = useState(0);
+
+    const handleReset = () => {
+        setIsResetConfirmOpen(true);
+    };
+
+    const performReset = () => {
+        // 1. CLEAR STORAGE FIRST to prevent race conditions with useEffects
+        try {
+            sessionStorage.removeItem('billing_activeBills');
+            sessionStorage.removeItem('billing_activeBillId');
+        } catch (e) {
+            console.error("Storage clear failed", e);
         }
-    };
 
-    const updateCurrentBill = (updates) => {
-        setActiveBills(prev => prev.map(bill =>
-            bill.id === activeBillId ? { ...bill, ...updates } : bill
-        ));
-    };
-
-    const calculateTotals = (cart, billDiscount = 0, additionalCharges = 0, loyaltyPointsDiscount = 0) => {
-        let grossTotal = 0;
-        let itemDiscount = 0;
-        let totalTax = 0;
-
-        const isInclusive = settings.tax?.defaultType === 'Inclusive' || settings.tax?.priceMode === 'Inclusive';
-
-        // Calculate line items first
-        cart.forEach(item => {
-            const price = parseFloat(item.price || item.sellingPrice || 0);
-            const qty = parseFloat(item.quantity || 0);
-            const discount = parseFloat(item.discount || 0);
-            const taxRate = parseFloat(item.taxRate || 0);
-
-            // Base Amount (Quantity * Unit Price)
-            let baseAmount = price * qty;
-            let taxAmount = 0;
-
-            if (isInclusive) {
-                // If Inclusive: Price = Base + Tax
-                // Base = Price / (1 + Rate/100)
-                const baseUnitPrice = price / (1 + (taxRate / 100));
-                baseAmount = baseUnitPrice * qty;
-                taxAmount = (price * qty) - baseAmount;
-            } else {
-                // Exclusive: Price is Base. Tax is extra.
-                // Base Amount is already price * qty
-                taxAmount = baseAmount * (taxRate / 100);
-            }
-
-            grossTotal += baseAmount;
-            // Discount applies to the base value usually? 
-            // Standard POS: Discount is usually on selling price (inclusive or exclusive).
-            // Let's assume Discount is a flat reduction on the line total.
-            // If inclusive, we reduce the "Inclusive Total" then back-calculate tax? Complex.
-            // Simplified: Discount reduces the Taxable Amount.
-            // Adjusted Base = Base Amount - Discount
-            // Adjusted Tax = Adjusted Base * Rate / 100
-
-            // To keep simple for now without complex inclusive-discount logic:
-            // We treat discount as post-tax deduction or pre-tax? 
-            // Usually Pre-Tax.
-
-            // Let's stick to simple iterative sum for now matching the existing structure but adding tax.
-
-            // Re-logic for robustness:
-            // 1. Line Total (Qty * Price)
-            // 2. Less Item Discount
-            // 3. Taxable Value = (1) - (2) [If exclusive]
-            // 4. Tax = Taxable * Rate
-
-            // If Inclusive:
-            // 1. Line Total (Inclusive)
-            // 2. Less Discount
-            // 3. Taxable = (Line Total - Discount) / (1 + rate)
-            // 4. Tax = (Line Total - Discount) - Taxable
-
-            const lineTotalRaw = (price * qty);
-            itemDiscount += discount;
-
-            const effectiveTotal = Math.max(0, lineTotalRaw - discount);
-            let taxableValue = effectiveTotal;
-            let lineTax = 0;
-
-            if (isInclusive) {
-                taxableValue = effectiveTotal / (1 + (taxRate / 100));
-                lineTax = effectiveTotal - taxableValue;
-            } else {
-                lineTax = taxableValue * (taxRate / 100);
-            }
-
-            totalTax += lineTax;
-            // Warning: grossTotal definitions vary. Let's set it as Sum of (Price * Qty).
-        });
-
-        // Re-sum gross from scratch for clarity
-        // Let's blindly trust the simple logic:
-        // Gross = Sum(Price * Qty)
-        // Subtotal = Gross - ItemDiscounts
-        // Tax = Calculated above
-        // Total = Subtotal + Tax + Charges - BillDiscount
-
-        // Correction: If Exclusive, Subtotal usually excludes Tax.
-        // If Inclusive, Subtotal includes Tax? No, cleaner to separate.
-
-        // Let's standardize: 
-        // Gross = Sum of (Qty * Unit Price). 
-        // Subtotal = Taxable Value Sum (after item discounts).
-
-        // Refined Loop for aggregates:
-        let aggGross = 0;
-        let aggItemDisc = 0;
-        let aggTax = 0;
-        let aggSubtotal = 0; // This will be Taxable Value
-
-        cart.forEach(item => {
-            const price = parseFloat(item.price || item.sellingPrice || 0);
-            const qty = parseFloat(item.quantity || 0);
-            const discount = parseFloat(item.discount || 0);
-            const taxRate = parseFloat(item.taxRate || 0);
-
-            aggGross += (price * qty);
-            aggItemDisc += discount;
-
-            const effectiveAmount = Math.max(0, (price * qty) - discount);
-
-            if (isInclusive) {
-                const taxable = effectiveAmount / (1 + (taxRate / 100));
-                const tax = effectiveAmount - taxable;
-                aggSubtotal += taxable;
-                aggTax += tax;
-            } else {
-                aggSubtotal += effectiveAmount;
-                aggTax += (effectiveAmount * (taxRate / 100));
-            }
-        });
-
-        const totalBeforeDiscounts = aggSubtotal + aggTax + additionalCharges;
-        const total = Math.max(0, totalBeforeDiscounts - billDiscount - loyaltyPointsDiscount);
-
-        return {
-            grossTotal: aggGross,
-            itemDiscount: aggItemDisc,
-            subtotal: aggSubtotal,
-            tax: aggTax,
-            discount: billDiscount + loyaltyPointsDiscount,
-            additionalCharges,
-            total,
-            roundOff: 0
+        // 2. PREPARE CLEAN STATE
+        const newBillId = Date.now();
+        const cleanBill = {
+            id: newBillId,
+            customer: null,
+            cart: [],
+            totals: {
+                grossTotal: 0, itemDiscount: 0, subtotal: 0, tax: 0, discount: 0, additionalCharges: 0, roundOff: 0, total: 0
+            },
+            gstSummary: {},
+            paymentMode: null,
+            amountReceived: '',
+            remarks: '',
+            billDiscount: 0,
+            additionalCharges: 0,
+            loyaltyPointsDiscount: 0,
+            status: 'Pending',
+            taxType: 'Intra-State'
         };
+
+        // 3. BATCH STATE UPDATES
+        setActiveBills([cleanBill]);
+        setActiveBillId(newBillId);
+        setSelectedItemId(null);
+        setSearchTerm('');
+        setModals({ itemDiscount: false, billDiscount: false, remarks: false, additionalCharges: false, loyaltyPoints: false, customerSearch: false, quantityChange: false, variantSelection: false, invoiceDelivery: false });
+        setIsProcessing(false);
+        setSavedInvoiceData(null);
+
+        addToast('Billing session reset', 'success');
+
+        // 4. TRIGGER FOCUS
+        setTriggerFocus(prev => prev + 1);
     };
 
-    // --- Calculations ---
-    useEffect(() => {
-        // Recalculate whenever cart, discounts or charges change
-        const newTotals = calculateTotals(
-            currentBill.cart,
-            currentBill.billDiscount || 0,
-            currentBill.additionalCharges || 0,
-            currentBill.loyaltyPointsDiscount || 0
-        );
+    // Robust Focus Management using useLayoutEffect
+    // This runs synchronously after DOM mutations but before paint, 
+    // ensuring the user sees the cursor immediately.
+    useLayoutEffect(() => {
+        if (triggerFocus > 0) {
+            const focusSearch = () => {
+                const input = document.getElementById('main-search-input');
+                if (input) {
+                    input.focus();
+                    // Optional: Select text if any
+                    // input.select(); 
+                } else if (searchInputRef.current) {
+                    searchInputRef.current.focus();
+                }
+            };
 
-        // Only update if numbers are different to avoid loop
-        if (newTotals.total !== currentBill.totals.total || newTotals.subtotal !== currentBill.totals.subtotal) {
-            updateCurrentBill({ totals: newTotals });
+            // Immediate attempt
+            focusSearch();
+
+            // Backup attempt for safety (in case of complex re-renders)
+            const timer = setTimeout(focusSearch, 50);
+            return () => clearTimeout(timer);
         }
-    }, [currentBill.cart, currentBill.billDiscount, currentBill.additionalCharges, currentBill.loyaltyPointsDiscount]);
+    }, [triggerFocus, activeBillId]); // Re-run on bill switch too
 
-    // --- Filter products ---
-    const filteredProducts = searchTerm
-        ? products.filter(p =>
-            p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (p.sku && p.sku.toLowerCase().includes(searchTerm.toLowerCase()))
-        ).slice(0, 8)
-        : [];
+    // Auto-focus on Mount (Navigation to this page)
+    useEffect(() => {
+        // Trigger the robust focus logic
+        setTriggerFocus(prev => prev + 1);
+    }, []);
 
-    // --- Actions: Cart ---
+
+
+    // Search Logic
+    const filteredProducts = useMemo(() => {
+        if (!deferredSearchTerm) return [];
+        const terms = deferredSearchTerm.toLowerCase().split(/\s+/).filter(t => t.trim());
+        if (terms.length === 0) return [];
+
+        return products.filter(Boolean).map(p => {
+            let score = 0;
+            const name = p.name || ''; const sku = p.sku || ''; const barcode = p.barcode || '';
+
+            // Normalize product text once
+            const normalizedProductText = normalizeSearchText(`${name} ${sku} ${barcode} ${(p.variants || []).map(v => `${v.sku || ''} ${v.barcode || ''} ${v.name || ''}`).join(' ')}`);
+
+            // Check if ALL terms match the normalized product text
+            if (!terms.every(term => normalizedProductText.includes(normalizeSearchText(term)))) return null;
+
+            // Scoring (Keep existing simple logic or update to normalized - keeping simple for now but using normalized for exact matches)
+            const lowerTerm = deferredSearchTerm.toLowerCase();
+            const normalizedTerm = normalizeSearchText(deferredSearchTerm);
+            const normalizedName = normalizeSearchText(name);
+            const normalizedSku = normalizeSearchText(sku);
+            const normalizedBarcode = normalizeSearchText(barcode);
+
+            if (normalizedBarcode === normalizedTerm) score += 100;
+            else if (normalizedSku === normalizedTerm) score += 90;
+            else if (normalizedName === normalizedTerm) score += 80;
+            else if (normalizedName.startsWith(normalizedTerm)) score += 50;
+            score += 10;
+
+            return { product: p, score };
+        }).filter(Boolean).sort((a, b) => b.score - a.score).map(item => item.product).slice(0, 15);
+    }, [deferredSearchTerm, products]);
+
+    useEffect(() => {
+        setSearchActiveIndex(filteredProducts.length > 0 ? 0 : -1);
+    }, [deferredSearchTerm, filteredProducts.length]);
+
+    // Actions
     const addToCart = (product) => {
+        // --- Stock Check ---
+        // For products with variants, stock is checked at the variant level in addVariantToCart or VariantSelectionModal.
+        // For simple products, we check here.
+        if ((!product.variants || product.variants.length === 0) && (product.stock !== undefined && product.stock !== null)) {
+            if (product.stock <= 0 && settings?.billing?.allowNegativeStock !== true) {
+                addToast(`Product "${product.name}" is out of stock!`, 'error');
+                return;
+            }
+        }
+
+        if (product.variants && product.variants.length > 0) {
+            setSelectedProductForVariant(product);
+            setModals(prev => ({ ...prev, variantSelection: true }));
+            setSearchTerm('');
+            return;
+        }
         const productId = product.id || product._id;
         const price = product.price || product.sellingPrice || 0;
-
         let newCart = [...currentBill.cart];
-        const existingIndex = newCart.findIndex(item => (item.id || item._id) === productId);
+        const existingIndex = newCart.findIndex(item => (item.id || item._id) === productId && !item.variantIndex);
 
         if (existingIndex > -1) {
+            // Check stock for increment
+            if (product.stock !== undefined && product.stock !== null) {
+                if (newCart[existingIndex].quantity + 1 > product.stock && settings?.billing?.allowNegativeStock !== true) {
+                    addToast(`Cannot add more. Reached stock limit for "${product.name}"`, 'error');
+                    return;
+                }
+            }
             newCart[existingIndex].quantity += 1;
             const itemPrice = newCart[existingIndex].price || newCart[existingIndex].sellingPrice || 0;
             newCart[existingIndex].total = (newCart[existingIndex].quantity * itemPrice) - (newCart[existingIndex].discount || 0);
         } else {
-            newCart.push({ ...product, quantity: 1, total: price, discount: 0, taxRate: product.taxRate || 0 });
+            const taxRate = product.taxRate !== undefined ? product.taxRate : (product.tax_rate !== undefined ? product.tax_rate : 0);
+            newCart.push({ ...product, quantity: 1, total: price, discount: 0, discountPercent: 0, taxRate: parseFloat(taxRate) || 0 });
         }
-
         updateCurrentBill({ cart: newCart });
         setSearchTerm('');
-        if (searchInputRef.current) searchInputRef.current.focus();
-        // Auto select newly added item
-        setSelectedItemId(product.id || product._id);
+
+        // Continuous scanning: refocus search
+        setTimeout(() => {
+            searchInputRef.current?.focus();
+        }, 0);
     };
 
-    const updateQuantity = (id, newQty) => {
-        if (newQty < 1) return;
-        const newCart = currentBill.cart.map(item => {
-            const itemId = item.id || item._id;
-            const price = item.price || item.sellingPrice || 0;
-            const discount = item.discount || 0;
-            return itemId === id ? { ...item, quantity: newQty, total: (newQty * price) - discount } : item;
-        });
-        updateCurrentBill({ cart: newCart });
-    };
-
-    const removeItem = (id) => {
-        const newCart = currentBill.cart.filter(item => (item.id || item._id) !== id);
-        updateCurrentBill({ cart: newCart });
-        if (id === selectedItemId) setSelectedItemId(null);
-    };
-
-    const handleRowClick = (id) => {
-        setSelectedItemId(id);
-    };
-
-    // --- Actions: Key Handlers ---
-    const handleF2 = () => {
-        // Change Qty
-        if (selectedItemId) {
-            const qtyInput = document.getElementById(`qty-${selectedItemId}`);
-            if (qtyInput) {
-                qtyInput.focus();
-                qtyInput.select();
-            } else {
-                // Fallback if ID scheme fails or logic differs
-                // Since input is inside grid, let's use a simpler prompt/modal if focus fails
-                // But simpler: just toggle a 'isEditingQty' state? 
-                // For now, let's try to focus the input if we add IDs to them in Grid.
-                // Alternate: Open small modal
+    const addVariantToCart = (product, variant, variantIndex, quantity = 1) => {
+        // --- Stock Check for Variant ---
+        if (variant.stock !== undefined && variant.stock !== null) {
+            if (variant.stock <= 0 && settings?.billing?.allowNegativeStock !== true) {
+                addToast(`Variant "${variant.name || variant.options.join(' ')}" is out of stock!`, 'error');
+                return;
             }
         }
-    };
 
-    const handleF3 = () => {
-        // Item Discount
-        if (selectedItemId) {
-            setModals(prev => ({ ...prev, itemDiscount: true }));
-        } else {
-            alert("No item selected for discount.");
-        }
-    };
+        const productId = product.id || product._id;
+        const price = variant.price || 0;
+        let newCart = [...currentBill.cart];
+        const existingIndex = newCart.findIndex(item => (item.id || item._id) === productId && item.variantIndex === variantIndex);
 
-    const handleF4 = () => {
-        // Remove Item
-        if (selectedItemId) {
-            removeItem(selectedItemId);
-        } else if (currentBill.cart.length > 0) {
-            // If nothing specifically selected, clean last?
-            // Or enforce selection
-            alert("Please select an item to remove.");
-        }
-    };
-
-    const handleF6 = () => {
-        // Change Unit - Toggle Pattern (PCS -> BOX -> PCS)
-        if (selectedItemId) {
-            const newCart = currentBill.cart.map(item => {
-                const itemId = item.id || item._id;
-                if (itemId === selectedItemId) {
-                    const currentUnit = item.unit?.toLowerCase() || 'pcs';
-                    const newUnit = currentUnit === 'pcs' ? 'box' : 'pcs';
-                    return { ...item, unit: newUnit };
+        if (existingIndex > -1) {
+            // Check stock for increment
+            if (variant.stock !== undefined && variant.stock !== null) {
+                if (newCart[existingIndex].quantity + quantity > variant.stock && settings?.billing?.allowNegativeStock !== true) {
+                    addToast(`Cannot add more. Reached stock limit for "${variant.name || variant.options.join(' ')}"`, 'error');
+                    return;
                 }
-                return item;
-            });
-            updateCurrentBill({ cart: newCart });
+            }
+
+            newCart[existingIndex].quantity += quantity;
+            const itemPrice = newCart[existingIndex].price || newCart[existingIndex].sellingPrice || 0;
+            newCart[existingIndex].total = (newCart[existingIndex].quantity * itemPrice) - (newCart[existingIndex].discount || 0);
         } else {
-            alert("No item selected. Please select an item to change its unit.");
+            // Basic initial check already done above, but ensuring quantity doesn't exceed if we supported adding > 1 initially (which we do via arg)
+            if (variant.stock !== undefined && variant.stock !== null) {
+                if (quantity > variant.stock && settings?.billing?.allowNegativeStock !== true) {
+                    addToast(`Not enough stock. Available: ${variant.stock}`, 'error');
+                    return;
+                }
+            }
+
+            const taxRate = product.taxRate !== undefined ? product.taxRate : (product.tax_rate !== undefined ? product.tax_rate : 0);
+            newCart.push({
+                ...product, variantIndex, variantId: variant.id || variant._id, variantName: variant.name || variant.options[0], variantOptions: variant.options,
+                price: variant.price, sellingPrice: variant.price, stock: variant.stock, quantity, total: price * quantity, discount: 0, taxRate: parseFloat(taxRate) || 0
+            });
+        }
+        updateCurrentBill({ cart: newCart });
+    };
+
+    const updateQuantity = useCallback((id, newQty) => {
+        if (newQty < 1) return;
+        
+        // Find the item in cart to check stock
+        const cartItem = currentBill.cart.find(item => (item.id || item._id) === id);
+        if (cartItem && cartItem.stock !== undefined && cartItem.stock !== null) {
+            if (newQty > cartItem.stock && settings?.billing?.allowNegativeStock !== true) {
+                addToast(`Cannot set quantity to ${newQty}. Only ${cartItem.stock} available in stock.`, 'error');
+                return;
+            }
+        }
+        
+        setActiveBills(prevBills => {
+            return prevBills.map(bill => {
+                if (bill.id === activeBillId) {
+                    const newCart = bill.cart.map(item => {
+                        const itemId = item.id || item._id;
+                        const price = item.price || item.sellingPrice || 0;
+                        let discount = item.discount || 0;
+                        if (itemId === id) {
+                            const baseTotal = newQty * price;
+                            if (item.discountPercent > 0) discount = (baseTotal * item.discountPercent) / 100;
+                            return { ...item, quantity: newQty, discount: discount, total: Math.max(0, baseTotal - discount) };
+                        }
+                        return item;
+                    });
+                    return { ...bill, cart: newCart };
+                }
+                return bill;
+            });
+        });
+    }, [activeBillId, currentBill.cart, settings?.billing?.allowNegativeStock, addToast]);
+
+    const removeItem = useCallback((id) => {
+        if (!id) return;
+        setActiveBills(prevBills => {
+            return prevBills.map(bill => {
+                if (bill.id === activeBillId) {
+                    const newCart = bill.cart.filter(item => (item.id || item._id) !== id);
+                    return { ...bill, cart: newCart };
+                }
+                return bill;
+            });
+        });
+        if (id === selectedItemId) setSelectedItemId(null);
+        // Also remove from selectedItems if present
+        setSelectedItems(prev => prev.filter(itemId => itemId !== id));
+        setTimeout(() => searchInputRef.current?.focus(), 300);
+    }, [activeBillId, selectedItemId]);
+
+    const handleRowClick = useCallback((id) => setSelectedItemId(id), []);
+    
+    // Multi-select handlers
+    const handleMultiSelectToggle = useCallback((id) => {
+        setSelectedItems(prev => {
+            if (prev.includes(id)) {
+                return prev.filter(itemId => itemId !== id);
+            } else {
+                return [...prev, id];
+            }
+        });
+    }, []);
+    
+    const handleSelectAll = useCallback(() => {
+        const allIds = currentBill.cart.map(item => item.id || item._id);
+        setSelectedItems(allIds);
+    }, [currentBill.cart]);
+    
+    const handleClearSelection = useCallback(() => {
+        setSelectedItems([]);
+    }, []);
+    
+    const handleDiscountClick = useCallback((id) => {
+        setSelectedItemId(id);
+        setModals(prev => ({ ...prev, itemDiscount: true }));
+    }, []);
+
+    const handleF2 = () => {
+        if (selectedItemId) {
+            setModals(p => ({ ...p, quantityChange: true }));
+        } else {
+            addToast("Please select an item first", "error");
+            searchInputRef.current?.focus();
         }
     };
+    const handleCustomerChange = useCallback((customerData) => {
+        updateCurrentBill({ customer: customerData });
+    }, [updateCurrentBill]);
 
-    const handleF8 = () => {
-        setModals(prev => ({ ...prev, additionalCharges: true }));
-    };
+    const handleTaxTypeChange = useCallback((type) => {
+        updateCurrentBill({ taxType: type });
+    }, [updateCurrentBill]);
 
-    const handleF9 = () => {
-        setModals(prev => ({ ...prev, billDiscount: true }));
-    };
+    const handlePaymentChange = useCallback((field, value) => {
+        if (field === 'status') {
+            let updates = { status: value };
+            if (value === 'Unpaid') updates.amountReceived = 0;
+            if (value === 'Paid') updates.amountReceived = totals.total; // Use derived totals from closure
+            updateCurrentBill(updates);
+        } else {
+            updateCurrentBill({
+                [field === 'mode' ? 'paymentMode' : 'amountReceived']: value
+            });
+        }
+    }, [totals.total, updateCurrentBill]);
 
-    const handleF10 = () => {
-        setModals(prev => ({ ...prev, loyaltyPoints: true }));
-    };
+    const handleF3 = useCallback(() => {
+        if (selectedItemId) {
+            setModals(p => ({ ...p, itemDiscount: true }));
+        } else {
+            addToast("Please select an item first", "error");
+            searchInputRef.current?.focus();
+        }
+    }, [selectedItemId]);
 
-    const handleF12 = () => {
-        setModals(prev => ({ ...prev, remarks: true }));
-    };
+    const handleF4 = useCallback(() => {
+        // If multiple items are selected, delete all of them
+        if (selectedItems.length > 0) {
+            selectedItems.forEach(id => removeItem(id));
+            setSelectedItems([]);
+        } else if (selectedItemId) {
+            removeItem(selectedItemId);
+        } else {
+            addToast("Please select an item first", "error");
+            searchInputRef.current?.focus();
+        }
+    }, [selectedItemId, selectedItems, removeItem]);
+
+    const handleF8 = useCallback(() => setModals(p => ({ ...p, additionalCharges: true })), []);
+    const handleF9 = useCallback(() => setModals(p => ({ ...p, billDiscount: true })), []);
+    const handleF10 = useCallback(() => setModals(p => ({ ...p, loyaltyPoints: true })), []);
+    const handleF12 = useCallback(() => setModals(p => ({ ...p, remarks: true })), []);
+
+    // F7 - Unit Change
+    const handleF7 = useCallback(() => {
+        if (selectedItemId) {
+            setModals(p => ({ ...p, unitChange: true }));
+        } else {
+            addToast("Please select an item first", "error");
+            searchInputRef.current?.focus();
+        }
+    }, [selectedItemId, addToast]);
+
+    // F11 - Price Change
+    const handleF11 = useCallback(() => {
+        if (selectedItemId) {
+            setModals(p => ({ ...p, priceChange: true }));
+        } else {
+            addToast("Please select an item first", "error");
+            searchInputRef.current?.focus();
+        }
+    }, [selectedItemId, addToast]);
+
+    // Update Unit Handler
+    const handleUpdateUnit = useCallback((itemId, newUnit) => {
+        setActiveBills(prevBills => {
+            return prevBills.map(bill => {
+                if (bill.id === activeBillId) {
+                    const newCart = bill.cart.map(item => {
+                        if ((item.id || item._id) === itemId) {
+                            return { ...item, unit: newUnit };
+                        }
+                        return item;
+                    });
+                    return { ...bill, cart: newCart };
+                }
+                return bill;
+            });
+        });
+        addToast(`Unit updated successfully`, 'success');
+    }, [activeBillId, addToast]);
+
+    // Update Price Handler
+    const handleUpdatePrice = useCallback((itemIds, priceConfig) => {
+        const { value, type, adjustment } = priceConfig;
+        
+        setActiveBills(prevBills => {
+            return prevBills.map(bill => {
+                if (bill.id === activeBillId) {
+                    const newCart = bill.cart.map(item => {
+                        if (itemIds.includes(item.id || item._id)) {
+                            const currentPrice = item.price || item.sellingPrice || 0;
+                            let newPrice = currentPrice;
+
+                            if (type === 'absolute') {
+                                if (adjustment === 'set') newPrice = value;
+                                else if (adjustment === 'increase') newPrice = currentPrice + value;
+                                else if (adjustment === 'decrease') newPrice = Math.max(0, currentPrice - value);
+                            } else {
+                                // percentage
+                                if (adjustment === 'increase') newPrice = currentPrice * (1 + value / 100);
+                                else if (adjustment === 'decrease') newPrice = currentPrice * (1 - value / 100);
+                                else newPrice = currentPrice * (value / 100);
+                            }
+
+                            // Recalculate total with new price
+                            const baseTotal = item.quantity * newPrice;
+                            let discount = item.discount || 0;
+                            if (item.discountPercent > 0) {
+                                discount = (baseTotal * item.discountPercent) / 100;
+                            }
+                            
+                            return { 
+                                ...item, 
+                                price: newPrice, 
+                                sellingPrice: newPrice,
+                                total: Math.max(0, baseTotal - discount)
+                            };
+                        }
+                        return item;
+                    });
+                    return { ...bill, cart: newCart };
+                }
+                return bill;
+            });
+        });
+        addToast(`Price updated for ${itemIds.length} item(s)`, 'success');
+    }, [activeBillId, addToast]);
+
+    // Handle unit click from grid
+    const handleUnitClick = useCallback((itemId) => {
+        setSelectedItemId(itemId);
+        setModals(p => ({ ...p, unitChange: true }));
+    }, []);
+
+    // Handle price click from grid
+    const handlePriceClick = useCallback((itemId) => {
+        setSelectedItemId(itemId);
+        setModals(p => ({ ...p, priceChange: true }));
+    }, []);
 
     const handleApplyItemDiscount = (val, isPercent) => {
         if (!selectedItemId) return;
         const newCart = currentBill.cart.map(item => {
-            const itemId = item.id || item._id;
-            if (itemId === selectedItemId) {
+            if ((item.id || item._id) === selectedItemId) {
                 const price = item.price || item.sellingPrice || 0;
                 const baseTotal = item.quantity * price;
-                const discount = isPercent ? (baseTotal * val / 100) : val;
-                return { ...item, discount: discount, total: Math.max(0, baseTotal - discount) };
+                let discount = isPercent ? (baseTotal * val / 100) : val;
+                return { ...item, discount, discountPercent: isPercent ? val : 0, total: Math.max(0, baseTotal - discount) };
             }
             return item;
         });
@@ -396,194 +606,303 @@ const BillingPage = () => {
 
     const handleApplyBillDiscount = (val, isPercent) => {
         const subtotal = currentBill.cart.reduce((acc, item) => acc + item.total, 0);
-        const discount = isPercent ? (subtotal * val / 100) : val;
-        updateCurrentBill({ billDiscount: discount });
+        updateCurrentBill({ billDiscount: isPercent ? (subtotal * val / 100) : val });
     };
+    const handleApplyAdditionalCharges = (val) => updateCurrentBill({ additionalCharges: val });
+    const handleApplyLoyaltyRedemption = (val) => updateCurrentBill({ loyaltyPointsDiscount: val });
+    const handleSaveRemarks = (text) => updateCurrentBill({ remarks: text });
 
-    const handleApplyAdditionalCharges = (val) => {
-        updateCurrentBill({ additionalCharges: val });
-    };
-
-    const handleApplyLoyaltyRedemption = (val) => {
-        updateCurrentBill({ loyaltyPointsDiscount: val });
-    };
-
-    const handleSaveRemarks = (text) => {
-        updateCurrentBill({ remarks: text });
-    };
-
-    const handleSavePrint = async (format = '80mm') => {
-        if (currentBill.cart.length === 0) {
-            alert("Cart is empty!");
-            return;
+    const handleSavePrint = useCallback(async (format = '80mm') => {
+        if (isProcessing) return;
+        if (currentBill.cart.length === 0) return alert("Cart is empty!");
+        
+        // Check for items with 0 quantity
+        const zeroQuantityItems = currentBill.cart.filter(item => item.quantity <= 0);
+        if (zeroQuantityItems.length > 0) {
+            const itemNames = zeroQuantityItems.map(item => item.name).join(', ');
+            const proceed = window.confirm(`The following items have 0 quantity:\n${itemNames}\n\nDo you want to remove them and proceed with billing?`);
+            if (!proceed) return;
+            // Remove items with 0 quantity
+            const updatedCart = currentBill.cart.filter(item => item.quantity > 0);
+            updateCurrentBill({ cart: updatedCart });
+            if (updatedCart.length === 0) {
+                addToast("Cart is now empty", "error");
+                return;
+            }
         }
+        
+        setIsProcessing(true);
         try {
-            // Prepare payload for backend
+            let customer = currentBill.customer;
+            if (currentBill.customer?.phone && !currentBill.customer?.id) {
+                customer = await findOrCreateCustomer({
+                    mobile: currentBill.customer.phone, name: currentBill.customer.name || 'Customer',
+                    whatsappOptIn: currentBill.customer.whatsappOptIn, smsOptIn: currentBill.customer.smsOptIn, source: 'POS'
+                });
+            }
+
+            // CRITICAL FIX: Re-calculate totals to get enriched items with tax snapshots
+            const { enrichedCart, totals } = calculateTotals(
+                currentBill.cart,
+                currentBill.billDiscount,
+                currentBill.additionalCharges,
+                currentBill.loyaltyPointsDiscount,
+                currentBill.taxType,
+                settings
+            );
+
+            // CALCULATE PAYMENT
+            let paymentsPayload = [];
+            let quantityError = false;
+            // Validate Stock before saving
+            currentBill.cart.forEach(item => {
+                const stock = item.stock;
+                if (stock !== undefined && stock !== null && item.quantity > stock && settings?.billing?.allowNegativeStock !== true) {
+                    addToast(`Insufficient stock for ${item.name}`, 'error');
+                    quantityError = true;
+                }
+            });
+            if (quantityError) {
+                setIsProcessing(false);
+                return;
+            }
+
+            const amtReceived = parseFloat(currentBill.amountReceived) || 0;
+            let finalStatus = currentBill.status;
+
+            // Resolve Pending Status
+            if (finalStatus === 'Pending') {
+                if (amtReceived >= totals.total && totals.total > 0) finalStatus = 'Paid';
+                else if (amtReceived > 0) finalStatus = 'Partially Paid';
+                else finalStatus = 'Pending'; // Will prompt for payment method if not Credit
+            }
+
+            if (finalStatus === 'Paid') {
+                if (!currentBill.paymentMode) {
+                    addToast("Please select a payment method", "error");
+                    setIsProcessing(false);
+                    return;
+                }
+                paymentsPayload.push({
+                    id: crypto.randomUUID(),
+                    date: new Date(),
+                    amount: totals.total,
+                    method: currentBill.paymentMode
+                });
+            } else if (finalStatus === 'Partially Paid' || (finalStatus === 'Pending' && amtReceived > 0)) {
+                // If Pending but has amount, treat as Partial for validation
+                if (!currentBill.paymentMode) {
+                    addToast("Please select a payment method", "error");
+                    setIsProcessing(false);
+                    return;
+                }
+                if (amtReceived <= 0) {
+                    addToast("Please enter received amount", "error");
+                    setIsProcessing(false);
+                    return;
+                }
+                paymentsPayload.push({
+                    id: crypto.randomUUID(),
+                    date: new Date(),
+                    amount: amtReceived,
+                    method: currentBill.paymentMode
+                });
+                if (finalStatus === 'Pending') finalStatus = 'Partially Paid';
+            } else if (finalStatus === 'Pending' && amtReceived === 0) {
+                // User didn't select Paid/Partial/Unpaid and amount is 0. 
+                // Force them to choose status OR default to Credit?
+                // "User has control" -> Prompt them.
+                addToast("Please select a Payment Status (Paid, Partial, or Credit)", "error");
+                setIsProcessing(false);
+                return;
+            }
+            // If Unpaid/Credit, paymentsPayload remains empty
+
             const payload = {
-                customerId: currentBill.customer ? (currentBill.customer.id || currentBill.customer._id) : '',
-                customerName: currentBill.customer ? (currentBill.customer.fullName || currentBill.customer.name || `${currentBill.customer.firstName || ''} ${currentBill.customer.lastName || ''}`.trim()) : 'Walk-in Customer',
+                customerId: customer?.id || null,
+                customerName: customer?.fullName || customer?.name || 'Customer',
+                customerMobile: customer?.phone || '',
                 date: new Date(),
-                items: currentBill.cart
-                    .filter(item => (item.id || item._id) && item.quantity > 0) // Ensure valid items
-                    .map(item => ({
-                        productId: item.id || item._id, // Backend expects productId
-                        name: item.name,
-                        quantity: parseFloat(item.quantity) || 0,
-                        price: parseFloat(item.price || item.sellingPrice) || 0,
-                        total: parseFloat(item.total) || 0
-                    })),
-                grossTotal: parseFloat(currentBill.totals.grossTotal) || 0,
-                itemDiscount: parseFloat(currentBill.totals.itemDiscount) || 0,
-                subtotal: parseFloat(currentBill.totals.subtotal) || 0,
-                tax: parseFloat(currentBill.totals.tax) || 0,
-                discount: parseFloat(currentBill.totals.discount) || 0,
-                additionalCharges: parseFloat(currentBill.totals.additionalCharges) || 0,
-                roundOff: parseFloat(currentBill.totals.roundOff) || 0,
-                total: parseFloat(currentBill.totals.total) || 0,
-                paymentMethod: currentBill.paymentMode || 'Cash',
-                status: currentBill.status || 'Paid', // Send status to backend
-                internalNotes: currentBill.remarks || '',
-                amountReceived: parseFloat(currentBill.amountReceived) || 0, // Pass amount received
+                // Use ENRICHED items which contain taxableValue, cgst, sgst, etc.
+                items: enrichedCart.map(item => ({
+                    productId: item.id || item._id, name: item.name, quantity: item.quantity, price: item.price,
+                    total: item.total, discount: item.discount, taxRate: item.taxRate,
+                    taxableValue: item.taxableValue || 0, cgst: item.cgst || 0, sgst: item.sgst || 0, igst: item.igst || 0, totalTax: item.totalTax || 0,
+                    variantId: item.variantId, hsnCode: item.hsnCode, // Ensure HSN is passed
+                    isInclusive: item.isInclusive // Critical for Print Display Logic
+                })),
+                grossTotal: totals.grossTotal, itemDiscount: totals.itemDiscount, subtotal: totals.subtotal,
+                tax: totals.tax, discount: totals.discount, additionalCharges: totals.additionalCharges,
+                roundOff: totals.roundOff, total: totals.total, paymentMethod: currentBill.paymentMode || '', /* Optional for backend if payments array used */
+                status: finalStatus, amountReceived: finalStatus === 'Unpaid' ? 0 : (amtReceived > 0 ? amtReceived : totals.total),
+                payments: paymentsPayload,
+                taxType: currentBill.taxType, // Save tax type (Intra/Inter)
+                cgst: totals.cgst, sgst: totals.sgst, igst: totals.igst, // Save tax totals
+                // NEW: Add detailed billing fields
+                remarks: currentBill.remarks || '',
+                billDiscount: currentBill.billDiscount || 0,
+                loyaltyPointsDiscount: currentBill.loyaltyPointsDiscount || 0
             };
 
-            console.log("Sending Invoice Payload:", payload);
             const savedBill = await addTransaction(payload);
+            refreshProducts(); refreshCustomers();
+            syncService.uploadEvent('INVOICE_CREATED', savedBill).catch(e => console.error(e));
 
-            // Print the receipt
-            console.log("Printing with Store Settings:", settings);
-            printReceipt(savedBill, format, settings);
-
-            // alert("Bill Saved Successfully!"); // Optional, print dialog is enough feedback? Keep for now.
-            closeBill(activeBillId); // Reset/Close after save
-        } catch (error) {
-            console.error("Save Error Details:", error);
-            if (error.response) {
-                console.error("Backend Error Response:", error.response.data);
+            // Only print receipt for fully paid invoices
+            // For Partial or Credit/Unpaid, save invoice but don't print
+            if (finalStatus === 'Paid') {
+                printReceipt(savedBill, format, settings);
+                addToast(`Bill #${savedBill.id} saved and printing...`, 'success');
+            } else {
+                addToast(`Invoice #${savedBill.id} saved (${finalStatus}). Receipt will be available after full payment.`, 'info');
             }
-            const errorMessage = error.response?.data?.message || error.message || "Failed to save bill.";
-            alert(`Failed to save bill: ${errorMessage}`);
-        }
-    };
 
-    // --- Keyboard Map ---
-    useKeyboardShortcuts({
-        'F2': handleF2,
-        'F3': handleF3,
-        'F4': handleF4,
-        'F6': handleF6,
-        'F8': handleF8,
-        'F9': handleF9,
-        'F10': handleF10,
-        'F12': handleF12,
-        'Ctrl+P': handleSavePrint,
-        'Control+p': handleSavePrint,
-        'Alt+T': addNewBill,            // Changed from Ctrl+T to avoid browser New Tab conflict
-        'Alt+t': addNewBill,
-        'Alt+W': () => closeBill(activeBillId), // Changed from Ctrl+W to avoid browser Close Tab conflict
-        'Alt+w': () => closeBill(activeBillId),
-        'F11': () => {
-            setModals(prev => ({ ...prev, customerSearch: true }));
-        }
-    });
+            closeBill(activeBillId);
+        } catch (error) {
+            console.error(error);
+            alert("Failed");
+        } finally { setIsProcessing(false); }
+    }, [isProcessing, currentBill, settings, activeBillId, addTransaction, refreshProducts, refreshCustomers, addToast, findOrCreateCustomer, closeBill]);
 
-    const handleFunctionClick = (key) => {
+    const handleF6 = useCallback(() => {
+        if (selectedItemId) {
+            setModals(p => ({ ...p, quantityChange: true }));
+        } else {
+            addToast("Please select an item first", "error");
+            searchInputRef.current?.focus();
+        }
+    }, [selectedItemId]);
+    
+    // Handle Delete key for deleting selected items
+    const handleDelete = useCallback(() => {
+        if (selectedItems.length > 0) {
+            selectedItems.forEach(id => removeItem(id));
+            setSelectedItems([]);
+        } else if (selectedItemId) {
+            removeItem(selectedItemId);
+        }
+    }, [selectedItemId, selectedItems, removeItem]);
+    
+    // Handle Arrow Up/Down navigation in grid
+    const handleArrowNavigation = useCallback((direction) => {
+        const cart = currentBill.cart;
+        if (cart.length === 0) return;
+        
+        const currentIndex = cart.findIndex(item => (item.id || item._id) === selectedItemId);
+        
+        if (direction === 'down') {
+            if (currentIndex < cart.length - 1) {
+                setSelectedItemId(cart[currentIndex + 1]?.id || cart[currentIndex + 1]?._id);
+            } else if (currentIndex === -1) {
+                setSelectedItemId(cart[0]?.id || cart[0]?._id);
+            }
+        } else if (direction === 'up') {
+            if (currentIndex > 0) {
+                setSelectedItemId(cart[currentIndex - 1]?.id || cart[currentIndex - 1]?._id);
+            } else if (currentIndex === -1) {
+                setSelectedItemId(cart[cart.length - 1]?.id || cart[cart.length - 1]?._id);
+            }
+        }
+    }, [currentBill.cart, selectedItemId]);
+
+    useKeyboardShortcuts({ 'F2': handleF2, 'F3': handleF3, 'F4': handleF4, 'F5': handleReset, 'F6': handleF6, 'F7': handleF7, 'F8': handleF8, 'F9': handleF9, 'F10': handleF10, 'F11': handleF11, 'F12': handleF12, 'Ctrl+P': handleSavePrint, 'Delete': handleDelete, 'ArrowDown': () => handleArrowNavigation('down'), 'ArrowUp': () => handleArrowNavigation('up') });
+
+    const handleFunctionClick = useCallback((key) => {
         switch (key) {
             case 'F2': handleF2(); break;
             case 'F3': handleF3(); break;
             case 'F4': handleF4(); break;
+            case 'F5': handleReset(); break;
             case 'F6': handleF6(); break;
+            case 'F7': handleF7(); break;
             case 'F8': handleF8(); break;
             case 'F9': handleF9(); break;
             case 'F10': handleF10(); break;
+            case 'F11': handleF11(); break;
             case 'F12': handleF12(); break;
             default: break;
         }
+    }, [handleF2, handleF3, handleF4, handleReset, handleF6, handleF7, handleF8, handleF9, handleF10, handleF11, handleF12]);
+
+    const handleSearchKeyDown = (e) => {
+        if (!filteredProducts.length) return;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setSearchActiveIndex(prev => (prev + 1) % filteredProducts.length);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setSearchActiveIndex(prev => (prev - 1 + filteredProducts.length) % filteredProducts.length);
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (searchActiveIndex >= 0 && filteredProducts[searchActiveIndex]) {
+                addToCart(filteredProducts[searchActiveIndex]);
+            } else if (filteredProducts.length > 0) {
+                // If no item is highlighted but Enter is pressed, select the first one
+                addToCart(filteredProducts[0]);
+            }
+        }
     };
 
-    // --- Render ---
+
+    // Scroll active item into view
+    useEffect(() => {
+        if (searchActiveIndex >= 0 && suggestionsListRef.current) {
+            const activeItem = suggestionsListRef.current.children[searchActiveIndex];
+            if (activeItem) {
+                activeItem.scrollIntoView({ block: 'nearest' });
+            }
+        }
+    }, [searchActiveIndex]);
+
     return (
-        <div className="flex h-[calc(100vh-theme(spacing.16))] flex-col bg-slate-50">
+        <div className="flex flex-col h-full w-full bg-zinc-50 overflow-hidden">
             {/* Top Bar - Tabs & Tools */}
-            <div className="flex justify-between items-center p-2 bg-white border-b shadow-sm h-12">
-                <div className="flex gap-2 items-end h-full overflow-x-auto">
+            <div className="shrink-0 flex justify-between items-center px-2 bg-white border-b shadow-sm h-10">
+                <div className="flex gap-2 items-end h-full overflow-x-auto overflow-y-hidden no-scrollbar">
                     {activeBills.map(bill => (
-                        <div
-                            key={bill.id}
-                            onClick={() => setActiveBillId(bill.id)}
-                            className={`flex items-center gap-2 px-4 py-2 border-t border-x rounded-t-md text-sm font-bold cursor-pointer select-none relative -bottom-[1px] ${bill.id === activeBillId
-                                ? 'bg-white border-blue-500 text-blue-600 z-10'
-                                : 'bg-slate-100 border-slate-300 text-slate-500 hover:bg-slate-200'
-                                }`}
-                        >
+                        <div key={bill.id} onClick={() => setActiveBillId(bill.id)} className={`flex items-center gap-2 px-4 py-2 border-t border-x rounded-t-lg text-xs font-bold cursor-pointer select-none relative top-[1px] transition-all ${bill.id === activeBillId ? 'bg-white border-zinc-200 border-b-transparent text-zinc-900 shadow-[0_-2px_10px_-5px_rgba(0,0,0,0.05)] z-10' : 'bg-zinc-100 border-zinc-200 text-zinc-500 hover:bg-zinc-50 hover:text-zinc-700'}`}>
                             <span>#{bill.id}</span>
-                            {bill.id === activeBillId && <span className="text-xs text-slate-400 font-normal ml-2">Alt+W</span>}
-                            <X
-                                size={12}
-                                className="text-slate-400 hover:text-red-500 cursor-pointer ml-2"
-                                onClick={(e) => { e.stopPropagation(); closeBill(bill.id); }}
-                            />
+                            {bill.id === activeBillId && <span className="text-[10px] text-zinc-400 font-normal ml-1">Alt+W</span>}
+                            <X size={12} className="text-zinc-400 hover:text-zinc-900 cursor-pointer ml-1" onClick={(e) => { e.stopPropagation(); closeBill(bill.id); }} />
                         </div>
                     ))}
-                    <button
-                        onClick={addNewBill}
-                        className="flex items-center gap-1 px-3 py-1.5 text-slate-600 hover:bg-slate-100 rounded-md text-xs font-semibold mb-1"
-                    >
-                        <Plus size={14} /> New Bill [Alt+T]
+                    <button onClick={addNewBill} className="flex items-center gap-1 px-3 py-1.5 text-slate-600 hover:bg-slate-100 hover:text-black rounded-md text-xs font-semibold my-1 transition-colors" title="New Bill (Alt+T)">
+                        <Plus size={14} /> <span className="hidden sm:inline">New Bill</span>
+                    </button>
+                    <button onClick={handleReset} className="flex items-center gap-1 px-3 py-1.5 text-red-500 hover:bg-red-50 hover:text-red-700 rounded-md text-xs font-semibold my-1 transition-colors ml-2" title="Reset Session (F5)">
+                        <RefreshCcw size={14} /> <span className="hidden sm:inline">Reset <span className="opacity-75 font-normal ml-0.5">(F5)</span></span>
                     </button>
                 </div>
-
             </div>
 
-            {/* Main Workspace */}
-            <div className="flex flex-1 overflow-hidden p-2 gap-2 flex-col md:flex-row relative">
-
-                {/* Mobile Tab Toggles */}
-                <div className="md:hidden flex w-full bg-slate-200 rounded-lg p-1 mb-2 shrink-0">
-                    <button
-                        className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${mobileTab === 'items' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}
-                        onClick={() => setMobileTab('items')}
-                    >
-                        Items ({currentBill.cart.length})
-                    </button>
-                    <button
-                        className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${mobileTab === 'payment' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}
-                        onClick={() => setMobileTab('payment')}
-                    >
-                        Payment (₹{currentBill.totals.total.toFixed(0)})
-                    </button>
-                </div>
-
-                {/* Left Pane - Search & Grid */}
-                <div className={`flex-1 flex flex-col gap-2 bg-transparent ${mobileTab === 'items' ? 'flex' : 'hidden md:flex'}`}>
-                    {/* Item Search Bar */}
-                    <div className="relative z-20">
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-500 h-5 w-5" />
-                            <Input
-                                ref={searchInputRef}
-                                autoFocus
-                                className="pl-10 h-12 text-lg border-blue-300 focus:border-blue-600 shadow-sm"
-                                placeholder="Scan or search..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                            />
+            {/* Main Workspace - 3 Panel Layout */}
+            <div className="flex-1 min-h-0 flex p-3 gap-3 overflow-hidden">
+                {/* CENTER PANEL: Billing Area (Search + Grid + Shortcuts) */}
+                <div className="flex-1 flex flex-col min-w-0 bg-white rounded-xl border border-zinc-200 shadow-sm h-full relative overflow-hidden">
+                    {/* 1. Search Bar (Fixed Top) */}
+                    <div className="shrink-0 p-3 border-b border-slate-100 bg-white z-20">
+                        <div className="relative flex gap-2">
+                            <div className="relative flex-1">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 h-4 w-4" />
+                                <Input id="main-search-input" ref={searchInputRef} autoFocus className="pl-10 h-11 text-sm bg-zinc-50 border-zinc-200 focus:bg-white focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 shadow-sm transition-all rounded-lg" placeholder="Scan barcode or search items..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} onKeyDown={handleSearchKeyDown} />
+                            </div>
                         </div>
                         {/* Autocomplete Dropdown */}
                         {searchTerm && filteredProducts.length > 0 && (
-                            <div className="absolute w-full mt-1 bg-white border rounded-md shadow-lg py-1 max-h-60 overflow-y-auto">
-                                {filteredProducts.map(product => (
-                                    <div
-                                        key={product.id || product._id}
-                                        className="px-4 py-2 hover:bg-blue-50 cursor-pointer flex justify-between border-b last:border-0"
-                                        onClick={() => addToCart(product)}
-                                    >
+                            <div ref={suggestionsListRef} className="absolute left-3 right-3 mt-1 bg-white border rounded-lg shadow-xl py-1 max-h-[300px] overflow-y-auto z-50">
+                                {filteredProducts.map((product, index) => (
+                                    <div key={product.id || product._id} className={`px-4 py-2 cursor-pointer flex justify-between items-center border-b border-slate-50 last:border-0 transition-colors ${index === searchActiveIndex ? 'bg-black' : 'hover:bg-slate-50'}`} onClick={() => addToCart(product)}>
                                         <div>
-                                            <span className="font-bold block text-slate-700">{product.name}</span>
-                                            <span className="text-xs text-slate-400">{product.sku} | {product.category}</span>
+                                            <span className={`font-semibold block text-sm ${index === searchActiveIndex ? 'text-white' : 'text-slate-800'}`}>{product.name}</span>
+                                            <div className={`flex items-center gap-2 text-xs ${index === searchActiveIndex ? 'text-slate-300' : 'text-slate-500'}`}>
+                                                <span className={`px-1 rounded ${index === searchActiveIndex ? 'bg-zinc-800 text-white' : 'bg-slate-100'}`}>{product.sku}</span>
+                                                <span className={index === searchActiveIndex ? 'text-slate-300' : 'text-slate-500'}>{product.category}</span>
+                                            </div>
                                         </div>
                                         <div className="text-right">
-                                            <span className="font-medium text-blue-600">₹{product.price || product.sellingPrice}</span>
-                                            <span className="block text-xs text-slate-400">Stock: {product.stock}</span>
+                                            <span className={`font-bold block ${index === searchActiveIndex ? 'text-white' : 'text-black'}`}>₹{product.price || product.sellingPrice}</span>
+                                            <span className={`text-xs ${product.stock < 5 ? (index === searchActiveIndex ? 'text-rose-300 font-medium' : 'text-red-600 font-medium') : (index === searchActiveIndex ? 'text-slate-300' : 'text-slate-400')}`}>Stock: {product.stock}</span>
                                         </div>
                                     </div>
                                 ))}
@@ -591,111 +910,159 @@ const BillingPage = () => {
                         )}
                     </div>
 
-                    {/* Data Grid */}
-                    <BillingGrid
-                        cart={currentBill.cart}
-                        updateQuantity={updateQuantity}
-                        removeItem={removeItem}
-                        selectedItemId={selectedItemId}
-                        onRowClick={handleRowClick}
-                        onDiscountClick={(id) => {
-                            setSelectedItemId(id);
-                            setModals(prev => ({ ...prev, itemDiscount: true }));
-                        }}
-                    />
+                    {/* 2. Billing Grid (Flexible Middle) */}
+                    <div className="flex-1 min-h-0 bg-slate-50/30 overflow-hidden relative flex flex-col">
+                        <BillingGrid
+                            cart={enrichedCart} // Use enriched cart with calculated values
+                            updateQuantity={updateQuantity}
+                            removeItem={removeItem}
+                            selectedItemId={selectedItemId}
+                            onRowClick={handleRowClick}
+                            onDiscountClick={handleDiscountClick}
+                            onUnitClick={handleUnitClick}
+                            onPriceClick={handlePriceClick}
+                            selectedItems={selectedItems}
+                            onMultiSelectToggle={handleMultiSelectToggle}
+                            onSelectAll={handleSelectAll}
+                            onClearSelection={handleClearSelection}
+                        />
+                    </div>
 
-                    {/* Mobile Floating Pay Button (only on Items tab) */}
-                    <div className="md:hidden mt-2">
-                        <Button
-                            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold h-12"
-                            onClick={() => setMobileTab('payment')}
-                        >
-                            Proceed to Pay ₹{currentBill.totals.total.toFixed(2)}
-                        </Button>
+                    {/* 3. Bottom Function Bar (Fixed Bottom) */}
+                    <div className="shrink-0 border-t border-zinc-200 bg-white relative z-20">
+                        <BottomFunctionBar onFunctionClick={handleFunctionClick} />
                     </div>
                 </div>
 
-                {/* Right Pane - Sidebar */}
-                <div className={`${mobileTab === 'payment' ? 'flex flex-1 overflow-auto' : 'hidden md:block'} w-full md:w-auto`}>
+                {/* RIGHT PANEL: Sidebar */}
+                <div className="w-[340px] lg:w-[380px] xl:w-[400px] shrink-0 h-full flex flex-col overflow-hidden rounded-xl shadow-sm border border-zinc-200 bg-white">
                     <BillingSidebar
                         customer={currentBill.customer}
-                        onCustomerSearch={(e) => {
-                            if (currentBill.customer) {
-                                if (e === null) {
-                                    updateCurrentBill({ customer: null });
-                                } else {
-                                    setModals(prev => ({ ...prev, customerSearch: true }));
-                                }
-                            } else {
-                                setModals(prev => ({ ...prev, customerSearch: true }));
-                            }
-                        }}
-                        totals={currentBill.totals}
-                        onPaymentChange={(field, value) => {
-                            if (field === 'status') {
-                                // Logic for auto-setting amount received based on status could go here
-                                // e.g., if status is Unpaid, amountReceived = 0
-                                let updates = { status: value };
-                                if (value === 'Unpaid') updates.amountReceived = 0;
-                                if (value === 'Paid') updates.amountReceived = currentBill.totals.total; // Auto-fill full amount? User convenience.
-                                updateCurrentBill(updates);
-                            } else {
-                                updateCurrentBill({
-                                    [field === 'mode' ? 'paymentMode' : 'amountReceived']: value
-                                });
-                            }
-                        }}
+                        onCustomerChange={handleCustomerChange}
+                        totals={totals} // Use derived totals
+                        gstSummary={gstSummary} // Use derived totals
+                        cart={currentBill.cart}
+                        settings={settings}
+                        taxType={currentBill.taxType}
+                        onTaxTypeChange={handleTaxTypeChange}
+                        onPaymentChange={handlePaymentChange}
                         paymentMode={currentBill.paymentMode}
-                        paymentStatus={currentBill.status || 'Paid'} // Pass status
+                        isProcessing={isProcessing}
+                        paymentStatus={currentBill.status || 'Paid'}
                         amountReceived={currentBill.amountReceived}
                         onSavePrint={handleSavePrint}
+                        onRemoveDiscount={() => handleApplyBillDiscount(0, false)}
+                        onEditDiscount={() => setModals(prev => ({ ...prev, billDiscount: true }))}
+                        onPreview={(invoiceData) => setPreviewInvoice(invoiceData)}
                     />
                 </div>
             </div>
 
-            {/* Bottom Function Bar */}
-            <BottomFunctionBar onFunctionClick={handleFunctionClick} />
-
+            {/* Action Modals */}
             {/* Action Modals */}
             <DiscountModal
                 isOpen={modals.itemDiscount}
-                onClose={() => setModals(prev => ({ ...prev, itemDiscount: false }))}
+                onClose={() => { setModals(prev => ({ ...prev, itemDiscount: false })); setTimeout(() => searchInputRef.current?.focus(), 300); }}
                 onApply={handleApplyItemDiscount}
                 title={`Item Discount - ${currentBill.cart.find(i => (i.id || i._id) === selectedItemId)?.name || 'Unknown'}`}
+                initialValue={currentBill.cart.find(i => (i.id || i._id) === selectedItemId)?.discountPercent || currentBill.cart.find(i => (i.id || i._id) === selectedItemId)?.discount || 0}
+                isPercentage={!!currentBill.cart.find(i => (i.id || i._id) === selectedItemId)?.discountPercent}
+                totalAmount={(() => { const item = currentBill.cart.find(i => (i.id || i._id) === selectedItemId); if (!item) return 0; return (parseFloat(item.price || item.sellingPrice) || 0) * (parseFloat(item.quantity) || 0); })()}
             />
             <DiscountModal
                 isOpen={modals.billDiscount}
-                onClose={() => setModals(prev => ({ ...prev, billDiscount: false }))}
+                onClose={() => { setModals(prev => ({ ...prev, billDiscount: false })); setTimeout(() => searchInputRef.current?.focus(), 300); }}
                 onApply={handleApplyBillDiscount}
                 title="Bill Discount"
                 initialValue={currentBill.billDiscount}
+                totalAmount={totals.subtotal}
             />
             <AdditionalChargesModal
                 isOpen={modals.additionalCharges}
-                onClose={() => setModals(prev => ({ ...prev, additionalCharges: false }))}
+                onClose={() => { setModals(prev => ({ ...prev, additionalCharges: false })); setTimeout(() => searchInputRef.current?.focus(), 300); }}
                 onApply={handleApplyAdditionalCharges}
                 initialValue={currentBill.additionalCharges}
             />
             <LoyaltyPointsModal
                 isOpen={modals.loyaltyPoints}
-                onClose={() => setModals(prev => ({ ...prev, loyaltyPoints: false }))}
+                onClose={() => { setModals(prev => ({ ...prev, loyaltyPoints: false })); setTimeout(() => searchInputRef.current?.focus(), 300); }}
                 onApply={handleApplyLoyaltyRedemption}
-                availablePoints={250} // Mock points
+                availablePoints={250}
             />
             <RemarksModal
                 isOpen={modals.remarks}
-                onClose={() => setModals(prev => ({ ...prev, remarks: false }))}
+                onClose={() => { setModals(prev => ({ ...prev, remarks: false })); setTimeout(() => searchInputRef.current?.focus(), 300); }}
                 onSave={handleSaveRemarks}
                 initialValue={currentBill.remarks}
             />
             <CustomerSearchModal
                 isOpen={modals.customerSearch}
-                onClose={() => setModals(prev => ({ ...prev, customerSearch: false }))}
+                onClose={() => { setModals(prev => ({ ...prev, customerSearch: false })); setTimeout(() => searchInputRef.current?.focus(), 300); }}
                 onSelect={(customer) => updateCurrentBill({ customer })}
             />
+            <QuantityModal
+                isOpen={modals.quantityChange}
+                onClose={() => { setModals(prev => ({ ...prev, quantityChange: false })); setTimeout(() => searchInputRef.current?.focus(), 300); }}
+                onApply={(newQty) => updateQuantity(selectedItemId, newQty)}
+                item={currentBill.cart.find(i => (i.id || i._id) === selectedItemId)}
+                allowNegativeStock={settings?.billing?.allowNegativeStock === true}
+            />
+            <VariantSelectionModal
+                isOpen={modals.variantSelection}
+                onClose={() => {
+                    setModals(prev => ({ ...prev, variantSelection: false }));
+                    setTimeout(() => searchInputRef.current?.focus(), 300);
+                }}
+                product={selectedProductForVariant}
+                onAddToCart={(product, variant, variantIndex, quantity) => {
+                    addVariantToCart(product, variant, variantIndex, quantity);
+                    setModals(prev => ({ ...prev, variantSelection: false }));
+                    setTimeout(() => searchInputRef.current?.focus(), 300);
+                }}
+            />
+            <UnitModal
+                isOpen={modals.unitChange}
+                onClose={() => { setModals(prev => ({ ...prev, unitChange: false })); setTimeout(() => searchInputRef.current?.focus(), 300); }}
+                onApply={handleUpdateUnit}
+                currentItem={selectedItemId}
+                cart={currentBill.cart}
+            />
+            <PriceModal
+                isOpen={modals.priceChange}
+                onClose={() => { setModals(prev => ({ ...prev, priceChange: false })); setTimeout(() => searchInputRef.current?.focus(), 300); }}
+                onApply={handleUpdatePrice}
+                selectedItems={selectedItemId ? [selectedItemId] : []}
+                cart={currentBill.cart}
+                isMultiple={false}
+            />
+
+            {/* Invoice Preview Modal - Alt+B for print, Enter for confirm */}
+            {previewInvoice && (
+                <InvoicePreviewModal
+                    isOpen={true}
+                    onClose={() => setPreviewInvoice(null)}
+                    invoice={previewInvoice}
+                    showConfirmButton={true}
+                    onConfirm={() => { setPreviewInvoice(null); handleSavePrint('80mm'); }}
+                    isSaved={false}
+                />
+            )}
+
+            <ConfirmationModal
+                isOpen={isResetConfirmOpen}
+                onClose={() => setIsResetConfirmOpen(false)}
+                onConfirm={performReset}
+                title="Reset Session?"
+                message="Are you sure you want to reset the entire billing session? This will clear all bills and unsaved changes."
+                variant="danger"
+            />
+
 
         </div>
     );
-};
+}
 
 export default BillingPage;
+
+
+

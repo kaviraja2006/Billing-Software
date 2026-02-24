@@ -2,7 +2,39 @@ import React from 'react';
 import { X, AlertTriangle } from 'lucide-react';
 import { Button } from './Button';
 
-const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, message, variant = 'danger' }) => {
+const ConfirmationModal = ({
+    isOpen,
+    onClose,
+    onConfirm,
+    onCancel,
+    title,
+    message,
+    variant = 'danger',
+    confirmText = 'Confirm',
+    cancelText = 'Cancel',
+    showCancel = false
+}) => {
+    // Handle Enter and Escape keys
+    React.useEffect(() => {
+        if (!isOpen) return;
+
+        const handleKeyDown = (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                e.stopPropagation();
+                onConfirm();
+                if (!showCancel) onClose();
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                e.stopPropagation();
+                onClose();
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isOpen, onConfirm, onClose, showCancel]);
+
     if (!isOpen) return null;
 
     return (
@@ -32,16 +64,23 @@ const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, message, variant
                 {/* Footer */}
                 <div className="px-6 py-4 bg-slate-50 flex justify-end gap-3 border-t border-slate-100">
                     <Button variant="secondary" onClick={onClose}>
-                        Cancel
+                        {showCancel ? 'Stay Here' : cancelText}
                     </Button>
+
+                    {showCancel && onCancel && (
+                        <Button variant="outline" onClick={onCancel}>
+                            {cancelText}
+                        </Button>
+                    )}
+
                     <Button
                         variant={variant}
                         onClick={() => {
                             onConfirm();
-                            onClose();
+                            if (!showCancel) onClose();
                         }}
                     >
-                        Confirm
+                        {confirmText}
                     </Button>
                 </div>
             </div>

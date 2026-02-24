@@ -2,22 +2,32 @@ import React, { useState, useMemo } from 'react';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/Table';
-import { Search, UserPlus, Filter, Eye, Phone, Mail, Trash2, X, Users, TrendingUp, AlertCircle, Award } from 'lucide-react';
+import { Search, UserPlus, Filter, Eye, Phone, Mail, Trash2, X, Users, TrendingUp, AlertCircle, Download, Award } from 'lucide-react';
 import CustomerDrawer from './CustomerDrawer';
+import { Modal } from '../../components/ui/Modal';
+import { utils, writeFile } from 'xlsx';
 import { useCustomers } from '../../context/CustomerContext';
-import { useToast } from '../../context/ToastContext';
+import { isSearchMatch } from '../../utils/searchUtils';
 
 const CustomersPage = () => {
     const { customers, addCustomer, updateCustomer, deleteCustomer, loading } = useCustomers();
-    const toast = useToast();
-    const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+    const [isCustomerDrawerOpen, setIsCustomerDrawerOpen] = useState(false);
     const [selectedCustomer, setSelectedCustomer] = useState(null);
+    const [initialTab, setInitialTab] = useState('details');
     const [searchTerm, setSearchTerm] = useState('');
     const [showFilters, setShowFilters] = useState(false);
     const [filters, setFilters] = useState({
         customerType: '',
         tags: [],
         source: ''
+    });
+
+    const [showExportModal, setShowExportModal] = useState(false);
+    const [exportOptions, setExportOptions] = useState({
+        type: 'all_time',
+        startDate: '',
+        endDate: '',
+        specificMonth: ''
     });
 
     // Calculate customer statistics
@@ -32,9 +42,9 @@ const CustomersPage = () => {
 
     const filteredCustomers = customers.filter(c => {
         const fullName = c.fullName || `${c.firstName || ''} ${c.lastName || ''}`.trim();
-        const matchesSearch = fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            c.phone.includes(searchTerm) ||
-            (c.email && c.email.toLowerCase().includes(searchTerm.toLowerCase()));
+        const matchesSearch = isSearchMatch(fullName, searchTerm) ||
+            isSearchMatch(c.phone, searchTerm) ||
+            isSearchMatch(c.email, searchTerm);
 
         const matchesType = !filters.customerType || c.customerType === filters.customerType;
         const matchesTags = filters.tags.length === 0 || filters.tags.some(tag => c.tags?.includes(tag));
@@ -43,14 +53,16 @@ const CustomersPage = () => {
         return matchesSearch && matchesType && matchesTags && matchesSource;
     });
 
-    const handleEdit = (customer) => {
+    const handleEdit = (customer, tab = 'details') => {
         setSelectedCustomer(customer);
-        setIsDrawerOpen(true);
+        setInitialTab(tab);
+        setIsCustomerDrawerOpen(true);
     };
 
     const handleAddNew = () => {
         setSelectedCustomer(null);
-        setIsDrawerOpen(true);
+        setInitialTab('details');
+        setIsCustomerDrawerOpen(true);
     };
 
     const handleSaveCustomer = async (customerData, addAnother = false) => {
@@ -61,7 +73,7 @@ const CustomersPage = () => {
                 await addCustomer(customerData);
             }
             if (!addAnother) {
-                setIsDrawerOpen(false);
+                setIsCustomerDrawerOpen(false);
             }
         } catch (error) {
             alert('Failed to save customer');
@@ -104,24 +116,91 @@ const CustomersPage = () => {
 
     const hasActiveFilters = filters.customerType || filters.tags.length > 0 || filters.source;
 
+    const handleConfirmExport = async () => {
+        try {
+            let start, end;
+            const now = new Date();
+
+            if (exportOptions.type === 'this_month') {
+                const s = new Date(now.getFullYear(), now.getMonth(), 1);
+                const e = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+                start = s.getTime(); end = e.getTime();
+            } else if (exportOptions.type === 'last_month') {
+                const s = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                const e = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+                start = s.getTime(); end = e.getTime();
+            } else if (exportOptions.type === 'specific_month' && exportOptions.specificMonth) {
+                const [year, month] = exportOptions.specificMonth.split('-');
+                const s = new Date(parseInt(year), parseInt(month) - 1, 1);
+                const e = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59, 999);
+                start = s.getTime(); end = e.getTime();
+            } else if (exportOptions.type === 'date_range' && exportOptions.startDate && exportOptions.endDate) {
+                const s = new Date(exportOptions.startDate);
+                s.setHours(0, 0, 0, 0);
+                const e = new Date(exportOptions.endDate);
+                e.setHours(23, 59, 59, 999);
+                start = s.getTime(); end = e.getTime();
+            } else if (exportOptions.type === 'all_time') {
+                start = 0;
+                end = Date.now() + 100000000000;
+            } else {
+                alert("Please select valid dates for export.");
+                return;
+            }
+
+            const exportData = customers.filter(c => {
+                const createdDate = new Date(c.createdAt || c.created_at || Date.now()).getTime();
+                return createdDate >= start && createdDate <= end;
+            });
+
+            if (exportData.length === 0) {
+                alert("No records found in the selected date range.");
+                return;
+            }
+
+            const dataToExport = exportData.map(c => ({
+                ID: c.id,
+                Name: c.fullName || `${c.firstName || ''} ${c.lastName || ''}`.trim(),
+                Phone: c.phone,
+                Email: c.email || '',
+                Type: c.customerType || '',
+                Tags: (c.tags || []).join(', '),
+                Source: c.source || '',
+                TotalSpent: c.totalSpent || 0,
+                TotalVisits: c.totalVisits || 0,
+                Due: c.due || 0,
+                Created: new Date(c.createdAt || c.created_at || Date.now()).toLocaleDateString()
+            }));
+
+            const ws = utils.json_to_sheet(dataToExport);
+            const wb = utils.book_new();
+            utils.book_append_sheet(wb, ws, "Customers_Export");
+            writeFile(wb, `Customers_Export_${exportOptions.type}_${new Date().toISOString().split('T')[0]}.xlsx`);
+            setShowExportModal(false);
+        } catch (error) {
+            console.error("Export failed", error);
+            alert("Export failed: " + error.message);
+        }
+    };
+
     const getTagBadge = (tag) => {
         const colors = {
-            'VIP': 'bg-purple-100 text-purple-700 border-purple-200',
-            'Wholesale': 'bg-blue-100 text-blue-700 border-blue-200',
-            'Credit': 'bg-orange-100 text-orange-700 border-orange-200'
+            'VIP': 'bg-slate-100 text-slate-700 border-slate-200',
+            'Wholesale': 'bg-slate-100 text-slate-700 border-slate-200',
+            'Credit': 'bg-slate-100 text-slate-700 border-slate-200',
+            'Regular': 'bg-slate-100 text-slate-700 border-slate-200',
+            'New': 'bg-slate-100 text-slate-700 border-slate-200'
         };
-        return colors[tag] || 'bg-gray-100 text-gray-700 border-gray-200';
+        return colors[tag] || 'bg-slate-100 text-slate-700 border-slate-200';
     };
 
     const getTypeBadge = (type) => {
-        return type === 'Business'
-            ? 'bg-indigo-100 text-indigo-700 border-indigo-200'
-            : 'bg-green-100 text-green-700 border-green-200';
+        return 'bg-slate-100 text-slate-700 border-slate-200';
     };
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center h-64">
+            <div className="flex items-center justify-center p-6 h-64">
                 <div className="text-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
                     <p className="mt-4 text-slate-600">Loading customers...</p>
@@ -131,64 +210,69 @@ const CustomersPage = () => {
     }
 
     return (
-        <div className="space-y-6">
+        <div className="p-6 space-y-6">
             {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-slate-900">Customers</h1>
                     <p className="text-slate-600 mt-1">Manage your customer relationships</p>
                 </div>
-                <Button onClick={handleAddNew} variant="primary" className="shadow-lg hover:shadow-xl transition-shadow">
-                    <UserPlus className="mr-2 h-4 w-4" /> Add Customer
-                </Button>
+                <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => setShowExportModal(true)} className="bg-white border-slate-200">
+                        <Download className="mr-2 h-4 w-4" /> Export
+                    </Button>
+                    <Button onClick={handleAddNew} variant="primary" className="shadow-lg hover:shadow-xl transition-shadow">
+                        <UserPlus className="mr-2 h-4 w-4" /> Add Customer
+                    </Button>
+                </div>
             </div>
 
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+                <div className="bg-black border border-slate-800 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-blue-600">Total Customers</p>
-                            <p className="text-3xl font-bold text-blue-900 mt-2">{stats.totalCustomers}</p>
+                            <p className="text-sm font-medium text-slate-400">Total Customers</p>
+                            <p className="text-3xl font-bold text-white mt-2">{stats.totalCustomers}</p>
                         </div>
-                        <div className="bg-blue-200 p-3 rounded-lg">
-                            <Users className="h-6 w-6 text-blue-700" />
+                        <div className="bg-slate-800 p-3 rounded-lg">
+                            <Users className="h-6 w-6 text-white" />
                         </div>
                     </div>
                 </div>
 
-                <div className="bg-gradient-to-br from-green-50 to-green-100 border border-green-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+                <div className="bg-black border border-slate-800 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-green-600">Total Revenue</p>
-                            <p className="text-3xl font-bold text-green-900 mt-2">₹{stats.totalRevenue.toFixed(0)}</p>
+                            <p className="text-sm font-medium text-slate-400">Total Revenue</p>
+                            <p className="text-3xl font-bold text-white mt-2">₹{stats.totalRevenue.toFixed(0)}</p>
                         </div>
-                        <div className="bg-green-200 p-3 rounded-lg">
-                            <TrendingUp className="h-6 w-6 text-green-700" />
+                        <div className="bg-slate-800 p-3 rounded-lg">
+                            <TrendingUp className="h-6 w-6 text-white" />
                         </div>
                     </div>
                 </div>
 
-                <div className="bg-gradient-to-br from-red-50 to-red-100 border border-red-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+                <div className="bg-black border border-slate-800 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-red-600">Outstanding Due</p>
-                            <p className="text-3xl font-bold text-red-900 mt-2">₹{stats.totalDue.toFixed(0)}</p>
+                            <p className="text-sm font-medium text-slate-400">Outstanding Due</p>
+                            <p className="text-3xl font-bold text-white mt-2">₹{stats.totalDue.toFixed(0)}</p>
                         </div>
-                        <div className="bg-red-200 p-3 rounded-lg">
-                            <AlertCircle className="h-6 w-6 text-red-700" />
+                        <div className="bg-slate-800 p-3 rounded-lg">
+                            <AlertCircle className="h-6 w-6 text-white" />
                         </div>
                     </div>
                 </div>
 
-                <div className="bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+                <div className="bg-black     border border-slate-800 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-purple-600">VIP Customers</p>
-                            <p className="text-3xl font-bold text-purple-900 mt-2">{stats.vipCustomers}</p>
+                            <p className="text-sm font-medium text-slate-400">VIP Customers</p>
+                            <p className="text-3xl font-bold text-white mt-2">{stats.vipCustomers}</p>
                         </div>
-                        <div className="bg-purple-200 p-3 rounded-lg">
-                            <Award className="h-6 w-6 text-purple-700" />
+                        <div className="bg-slate-800 p-3 rounded-lg">
+                            <Award className="h-6 w-6 text-white" />
                         </div>
                     </div>
                 </div>
@@ -306,6 +390,8 @@ const CustomersPage = () => {
                             <TableHead className="font-semibold">Customer</TableHead>
                             <TableHead className="font-semibold">Contact</TableHead>
                             <TableHead className="text-center font-semibold">Type & Tags</TableHead>
+                            <TableHead className="text-center font-semibold">Source</TableHead>
+                            <TableHead className="text-center font-semibold">GSTIN</TableHead>
                             <TableHead className="text-center font-semibold">Visits</TableHead>
                             <TableHead className="text-right font-semibold">Total Spent</TableHead>
                             <TableHead className="text-right font-semibold">Due</TableHead>
@@ -335,19 +421,26 @@ const CustomersPage = () => {
                                                 {customer.customerType}
                                             </span>
                                         )}
-                                        {Array.isArray(customer.tags) && customer.tags.map(tag => (
+                                        {customer.tags?.map(tag => (
                                             <span key={tag} className={`px-2.5 py-1 rounded-full text-xs font-medium border ${getTagBadge(tag)}`}>
                                                 {tag}
                                             </span>
                                         ))}
                                     </div>
                                 </TableCell>
-                                <TableCell className="text-center">
-                                    <span className="inline-flex items-center justify-center bg-slate-100 text-slate-700 rounded-full px-3 py-1 text-sm font-medium">
-                                        {customer.totalVisits || 0}
-                                    </span>
+                                <TableCell className="text-center text-sm text-slate-600">
+                                    {customer.source || '-'}
                                 </TableCell>
-                                <TableCell className="text-right font-semibold text-slate-900">
+                                <TableCell className="text-center text-sm font-mono text-slate-600">
+                                    {customer.gstin || '-'}
+                                </TableCell>
+                                <TableCell
+                                    className="text-center text-blue-600 font-medium cursor-pointer hover:underline"
+                                    onClick={() => handleEdit(customer, 'history')}
+                                >
+                                    {customer.totalVisits || 0}
+                                </TableCell>
+                                <TableCell className="text-right font-semibold text-slate-700">
                                     ₹{(customer.totalSpent || 0).toFixed(2)}
                                 </TableCell>
                                 <TableCell className="text-right">
@@ -462,11 +555,70 @@ const CustomersPage = () => {
             </div>
 
             <CustomerDrawer
-                isOpen={isDrawerOpen}
-                onClose={() => setIsDrawerOpen(false)}
+                isOpen={isCustomerDrawerOpen}
+                onClose={() => setIsCustomerDrawerOpen(false)}
                 customer={selectedCustomer}
                 onSave={handleSaveCustomer}
+                initialTab={initialTab}
             />
+
+            <Modal isOpen={showExportModal} onClose={() => setShowExportModal(false)} title="Export Customers" size="sm">
+                <div className="space-y-4">
+                    <div>
+                        <label className="text-sm font-medium text-slate-700 block mb-1">Export Range</label>
+                        <select
+                            className="w-full border p-2 rounded-lg text-sm outline-none focus:ring-2 focus:ring-slate-900 border-slate-200"
+                            value={exportOptions.type}
+                            onChange={(e) => setExportOptions({ ...exportOptions, type: e.target.value })}
+                        >
+                            <option value="all_time">All Time</option>
+                            <option value="this_month">This Month</option>
+                            <option value="last_month">Last Month</option>
+                            <option value="specific_month">Specific Month</option>
+                            <option value="date_range">Custom Date Range</option>
+                        </select>
+                    </div>
+
+                    {exportOptions.type === 'specific_month' && (
+                        <div>
+                            <label className="text-sm font-medium text-slate-700 block mb-1">Select Month</label>
+                            <Input
+                                type="month"
+                                value={exportOptions.specificMonth}
+                                onChange={(e) => setExportOptions({ ...exportOptions, specificMonth: e.target.value })}
+                            />
+                        </div>
+                    )}
+
+                    {exportOptions.type === 'date_range' && (
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="text-sm font-medium text-slate-700 block mb-1">Start Date</label>
+                                <Input
+                                    type="date"
+                                    value={exportOptions.startDate}
+                                    onChange={(e) => setExportOptions({ ...exportOptions, startDate: e.target.value })}
+                                />
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium text-slate-700 block mb-1">End Date</label>
+                                <Input
+                                    type="date"
+                                    value={exportOptions.endDate}
+                                    onChange={(e) => setExportOptions({ ...exportOptions, endDate: e.target.value })}
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="pt-4 flex justify-end gap-2 border-t mt-4">
+                        <Button variant="outline" onClick={() => setShowExportModal(false)}>Cancel</Button>
+                        <Button onClick={handleConfirmExport}>
+                            Export
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
 };

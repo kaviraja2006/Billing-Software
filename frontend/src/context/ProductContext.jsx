@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback, useMemo } from 'react';
 import services from '../services/api';
 import { useAuth } from './AuthContext';
 
@@ -17,6 +17,19 @@ export const ProductProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
     const { user, isLoading: authLoading } = useAuth();
 
+    const fetchProducts = useCallback(async () => {
+        setLoading(true);
+        try {
+            const response = await services.products.getAll();
+            setProducts((response.data || []).filter(Boolean));
+        } catch (error) {
+            console.error("Failed to fetch products", error);
+            setProducts([]);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
     useEffect(() => {
         // Only fetch if user is authenticated and auth is not loading
         if (authLoading || !user) {
@@ -27,22 +40,10 @@ export const ProductProvider = ({ children }) => {
             return;
         }
 
-        const fetchProducts = async () => {
-            setLoading(true);
-            try {
-                const response = await services.products.getAll();
-                setProducts(response.data);
-            } catch (error) {
-                console.error("Failed to fetch products", error);
-                setProducts([]);
-            } finally {
-                setLoading(false);
-            }
-        };
         fetchProducts();
     }, [user, authLoading]);
 
-    const addProduct = async (productData) => {
+    const addProduct = useCallback(async (productData) => {
         try {
             // Ensure sku is present for backend compatibility (it requires unique sku)
             // Strip UI-only fields like 'hasVariants'
@@ -64,11 +65,25 @@ export const ProductProvider = ({ children }) => {
             console.error("Failed to add product", error);
             throw error;
         }
-    };
+    }, []);
 
-    const addManyProducts = async (productsArray) => {
+    const addManyProducts = useCallback(async (productsArray) => {
         const addedProducts = [];
-        // Sequential upload to API
+
+        // Helper for safe number conversion
+        const safeFloat = (val) => {
+            const num = parseFloat(val);
+            return isNaN(num) ? 0 : num;
+        };
+
+        const safeInt = (val) => {
+            const num = parseInt(val, 10);
+            return isNaN(num) ? 0 : num;
+        };
+
+        // Get current products directly from state
+        const currentProducts = products;
+
         for (const rawP of productsArray) {
             // Normalize keys: trim and lowercase
             const p = {};
@@ -83,21 +98,44 @@ export const ProductProvider = ({ children }) => {
                 return undefined;
             };
 
-            const name = getVal(['name', 'product name', 'productname', 'item', 'item name', 'title']) || 'Imported Product';
-            const price = parseFloat(getVal(['price', 'mrp', 'rate', 'cost', 'amount', 'selling price', 'sp', 'unit price'])) || 0;
+            const nameVal = getVal(['name', 'product name', 'productname', 'item', 'item name', 'title', 'description', 'desc', 'particulars', 'model', 'product description']);
+            const name = (nameVal && nameVal.toString().trim()) ? nameVal.toString().trim() : 'Imported Product';
 
-            const barcode = getVal(['barcode', 'code', 'upc', 'ean', 'sku']) || `GEN-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+            // Check for duplicates
+            const barcodeVal = getVal(['barcode', 'code', 'upc', 'ean', 'sku']);
+            const barcode = barcodeVal || `GEN-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+            // Duplicate Check: Check against current products
+            const isDuplicate = currentProducts.some(existing => {
+                const sName = String(name).toLowerCase();
+                const sBarcode = String(barcode).toLowerCase();
+
+                if (barcodeVal && existing.barcode && String(existing.barcode).toLowerCase() === sBarcode) return true;
+                if (!barcodeVal && existing.name && String(existing.name).toLowerCase() === sName) return true;
+
+                return false;
+            });
+
+            if (isDuplicate) {
+                console.log("Skipping duplicate:", name, barcode);
+                continue;
+            }
+
+            const price = safeFloat(getVal(['price', 'mrp', 'rate', 'cost', 'amount', 'selling price', 'sp', 'unit price']));
 
             const productData = {
                 name: name,
                 category: getVal(['category', 'group', 'type']) || 'Uncategorized',
                 brand: getVal(['brand', 'company', 'make']) || '',
-                price: price,
-                stock: parseInt(getVal(['stock', 'qty', 'quantity', 'count', 'inventory', 'balance', 'units'])) || 0,
+                price: price, // Selling Price
+                stock: safeInt(getVal(['stock', 'current stock', 'qty', 'quantity'])),
                 barcode: barcode,
                 sku: barcode,
-                unit: getVal(['unit', 'uom', 'measure', 'units']) || 'pc',
-                description: getVal(['description', 'desc', 'details', 'specification']) || ''
+                unit: getVal(['unit', 'uom', 'measure']) || 'pc',
+                description: getVal(['description', 'desc', 'details']) || '',
+                minStock: safeInt(getVal(['min stock', 'minimum stock', 'alert', 'low stock', 'min. stock alert'])),
+                costPrice: safeFloat(getVal(['cost', 'cost price', 'buying price', 'cp'])),
+                taxRate: safeFloat(getVal(['tax', 'tax rate', 'gst', 'tax rate (%)']))
             };
 
             try {
@@ -108,10 +146,10 @@ export const ProductProvider = ({ children }) => {
             }
         }
         setProducts(prev => [...prev, ...addedProducts]);
-        return addedProducts;
-    };
+        return { added: addedProducts, skipped: productsArray.length - addedProducts.length };
+    }, []); // No dependencies - stable callback
 
-    const updateProduct = async (id, updatedData) => {
+    const updateProduct = useCallback(async (id, updatedData) => {
         try {
             const { hasVariants, ...rest } = updatedData;
             const payload = {
@@ -125,15 +163,15 @@ export const ProductProvider = ({ children }) => {
             };
             const response = await services.products.update(id, payload);
             const updatedProduct = response.data;
-            setProducts(prev => prev.map(p => p.id === id ? updatedProduct : p));
+            setProducts(prev => prev.map(p => p.id === id ? updatedProduct : p).filter(Boolean));
             return updatedProduct;
         } catch (error) {
             console.error("Failed to update product", error);
             throw error;
         }
-    };
+    }, []);
 
-    const deleteProduct = async (id) => {
+    const deleteProduct = useCallback(async (id) => {
         try {
             await services.products.delete(id);
             setProducts(prev => prev.filter(p => p.id !== id));
@@ -141,34 +179,50 @@ export const ProductProvider = ({ children }) => {
             console.error("Failed to delete product", error);
             throw error;
         }
-    };
+    }, []);
 
-    const updateStock = async (id, quantityChange) => {
-        // This is tricky as we need to know current stock to update it properly via API if API is "update" style (replace).
-        // Better to fetch fresh, update, then save. Or assume local state is consistent.
-        // For mock, let's assume local state is close enough or fetch first.
-        const product = products.find(p => p.id === id);
+    const updateStock = useCallback(async (id, quantityChange) => {
+        // Use functional update to access current product without dependency
+        let product = null;
+        setProducts(prev => {
+            product = prev.find(p => p.id === id);
+            return prev;
+        });
+
         if (product) {
             const newStock = Math.max(0, product.stock + quantityChange);
             await updateProduct(id, { stock: newStock });
         }
-    };
+    }, [updateProduct]); // Only depend on updateProduct which is stable
 
-    const getProductByBarcode = (code) => {
+    const getProductByBarcode = useCallback((code) => {
         return products.find(p => p.barcode === code);
-    };
+    }, [products]);
+
+    const value = useMemo(() => ({
+        products,
+        addProduct,
+        addManyProducts,
+        updateProduct,
+        deleteProduct,
+        updateStock,
+        getProductByBarcode,
+        refreshProducts: fetchProducts,
+        loading
+    }), [
+        products,
+        addProduct,
+        addManyProducts,
+        updateProduct,
+        deleteProduct,
+        updateStock,
+        getProductByBarcode,
+        fetchProducts,
+        loading
+    ]);
 
     return (
-        <ProductContext.Provider value={{
-            products,
-            addProduct,
-            addManyProducts,
-            updateProduct,
-            deleteProduct,
-            updateStock,
-            getProductByBarcode,
-            loading
-        }}>
+        <ProductContext.Provider value={value}>
             {children}
         </ProductContext.Provider>
     );

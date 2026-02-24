@@ -1,16 +1,37 @@
 const express = require("express");
 const passport = require("passport");
-const generateToken = require("../utils/generateToken");
+const generateToken = require("../utils/generateToken"); // Keep this as it's used in /google/callback
 const { protect } = require("../middleware/authMiddleware");
+const { logoutUser } = require("../controllers/authController");
 
 const router = express.Router();
 
-// Start Google OAuth
+// Start Google OAuth (includes Drive access)
 router.get(
   "/google",
   passport.authenticate("google", {
-    scope: ["profile", "email"],
+    scope: [
+      "profile",
+      "email",
+      "https://www.googleapis.com/auth/drive.file"
+    ],
+    accessType: "offline",
+    prompt: "consent", // Force consent to get fresh refresh token
     session: false,
+  })
+);
+
+// Start Google Drive Connect (Upgrade Permissions)
+router.get(
+  "/google/drive",
+  passport.authenticate("google", {
+    scope: [
+      "profile",
+      "email",
+      "https://www.googleapis.com/auth/drive.file"
+    ],
+    accessType: "offline", // Request refresh token
+    prompt: "consent" // Force consent screen to get fresh refresh token
   })
 );
 
@@ -28,35 +49,38 @@ router.get(
         return res.redirect("/auth/google/failure?reason=no_user");
       }
 
-    // Check User-Agent to determine environment
-    // Electron apps typically append 'Electron/...' to the UA string
-    // Check for 'state' query param to determine redirect target
-    // Passport google strategy usually handles state, but we can also just check req.query.state if we passed it manually in the first call?
-    // Actually, getting state back from Google requires enabling it in the initial call.
+      // ✅ CREATE JWT
+      const tokenPayload = {
+        name: user.name,
+        email: user.email,
+        googleSub: String(user.googleSub), // Ensure string
+      };
+      const token = generateToken(tokenPayload);
 
-    // Simpler approach for now: Check if the request origin/referrer implies web? 
-    // Or we can rely on a cookie set before the auth request?
+      console.log("✅ Auth Success. Generated Token for:", tokenPayload.googleSub);
 
-    // Let's use a simple query param on the CALLBACK itself? No, Google calls the callback.
-    // We need to pass 'state' to Google.
+      // Serve a page that redirects and attempts to close itself
+      const html = `
+        <!DOCTYPE html>
+        <html>
+          <body>
+            <p>Authentication successful! Redirecting to app...</p>
+            <script>
+              // Redirect to the custom scheme
+              window.location.href = "billing://auth?token=${token}";
+              // Attempt to close the window after a short delay
+              setTimeout(() => {
+                window.close();
+              }, 1000);
+            </script>
+          </body>
+        </html>
+      `;
 
-    // For now, let's just support both by defaulting to Web if we can't tell, or checking specifically.
-    // Actually, Electron user agent might be distinct?
-
-    const userAgent = req.headers['user-agent'] || '';
-    const isElectron = userAgent.includes('Electron');
-
-    if (isElectron) {
-      // Redirect back to Electron via custom protocol
-      res.redirect(`billing://auth?token=${token}`);
-    } else {
-      // Default to Web
-      // Assuming Vite dev server port 5173 or production URL
-      // Better to set this in ENV, but hardcoded for now matches user context
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-      // FIX: Use HashRouter syntax /#/
-      res.redirect(`${frontendUrl}/#/oauth-success?token=${token}`);
-    }
+      // Allow inline script for this specific response (overriding Helmet default)
+      res.setHeader("Content-Security-Policy", "script-src 'self' 'unsafe-inline'");
+      res.send(html);
+    })(req, res, next);
   }
 );
 
@@ -70,16 +94,15 @@ router.get("/google/failure", (req, res) => {
 router.get("/me", protect, (req, res) => {
   // req.user is set by the protect middleware after verifying JWT
   res.json({
+    name: req.user.name,
     email: req.user.email,
     googleSub: req.user.googleSub,
   });
 });
 
-// Logout endpoint
-router.post("/logout", (req, res) => {
-  // Since we're using JWT, logout is handled client-side by removing the token
-  // But we provide this endpoint for consistency
-  res.json({ message: "Logged out successfully" });
-});
+// @desc    Logout user / clear cookie
+// @route   POST /auth/logout
+// @access  Public
+router.get("/logout", logoutUser);
 
 module.exports = router;

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import services from '../../../services/api';
+import { formatCappedPercentage } from '../../../utils/formatUtils';
 import { TrendingUp, Calendar, DollarSign, Activity, X } from 'lucide-react';
 
 const ProductInsights = ({ product, onClose }) => {
@@ -30,9 +31,25 @@ const ProductInsights = ({ product, onClose }) => {
         : 0;
 
     const monthlySales = stats?.monthlySales || 0;
-    const lastSold = stats?.lastSold ? new Date(stats.lastSold).toLocaleDateString() : 'Never';
-    // Using updatedAt as proxy for last purchased/restocked
-    const lastPurchased = product.updatedAt ? new Date(product.updatedAt).toLocaleDateString() : 'Unknown';
+
+    const formatDate = (dateStr) => {
+        if (!dateStr || dateStr === 'Never') return 'Never';
+        try {
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return 'Unknown';
+            return d.toLocaleDateString();
+        } catch { return 'Unknown'; }
+    };
+
+    const lastSold = stats?.lastSold ? formatDate(stats.lastSold) : 'Never';
+
+    // Improved Last Restocked Logic:
+    // 1. Try stats.lastRestocked (if backend provides it)
+    // 2. Try product.lastPurchased (if available in product pivot)
+    // 3. Fallback to product.updatedAt (last modification)
+    // 4. Fallback to 'Unknown'
+    const lastPurchasedRaw = stats?.lastRestocked || product.lastPurchased || product.updatedAt;
+    const lastPurchased = lastPurchasedRaw ? formatDate(lastPurchasedRaw) : 'Unknown';
 
     const isProfitable = parseFloat(marginVal) > 20;
 
@@ -54,21 +71,21 @@ const ProductInsights = ({ product, onClose }) => {
 
                 {/* Quick Stats Grid */}
                 <div className="grid grid-cols-2 gap-3">
-                    <div className="p-3 bg-blue-50 rounded-lg">
-                        <div className="flex items-center gap-2 text-blue-600 mb-1">
+                    <div className="p-3 bg-black rounded-lg">
+                        <div className="flex items-center gap-2 text-white mb-1">
                             <TrendingUp size={14} />
                             <span className="text-xs font-medium">Sales (30d)</span>
                         </div>
-                        <p className="text-xl font-bold text-slate-900">
+                        <p className="text-xl font-bold text-white">
                             {loading ? '...' : monthlySales}
                         </p>
                     </div>
-                    <div className={`p-3 rounded-lg ${isProfitable ? 'bg-emerald-50' : 'bg-rose-50'}`}>
-                        <div className={`flex items-center gap-2 mb-1 ${isProfitable ? 'text-emerald-600' : 'text-rose-600'}`}>
+                    <div className={`p-3 rounded-lg border ${isProfitable ? 'bg-white border-black' : 'bg-neutral-100 border-neutral-300'}`}>
+                        <div className={`flex items-center gap-2 mb-1 ${isProfitable ? 'text-black' : 'text-neutral-600'}`}>
                             <DollarSign size={14} />
                             <span className="text-xs font-medium">Margin</span>
                         </div>
-                        <p className="text-xl font-bold text-slate-900">{marginVal}%</p>
+                        <p className="text-xl font-bold text-slate-900">{formatCappedPercentage(marginVal)}</p>
                     </div>
                 </div>
 
@@ -77,7 +94,7 @@ const ProductInsights = ({ product, onClose }) => {
                     <h5 className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Activity Timeline</h5>
                     <div className="relative pl-4 border-l border-slate-200 space-y-4">
                         <div className="relative">
-                            <div className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full bg-blue-500 border-2 border-white" />
+                            <div className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full bg-black border-2 border-white" />
                             <p className="text-sm font-medium text-slate-900">Last Sold</p>
                             <p className="text-xs text-slate-500">
                                 {loading ? '...' : lastSold}

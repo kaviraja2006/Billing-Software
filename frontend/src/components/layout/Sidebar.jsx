@@ -21,9 +21,9 @@ const Sidebar = ({ isOpen = true, toggleSidebar, isMobile, onCloseMobile }) => {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     const handleLogout = async () => {
-    await logout();
-    navigate("/login", { replace: true });
-  };
+        await logout();
+        navigate("/login", { replace: true });
+    };
     const navItems = [
         { label: 'Dashboard', icon: LayoutDashboard, path: '/' },
         { label: 'Billing', icon: Receipt, path: '/billing' },
@@ -31,6 +31,7 @@ const Sidebar = ({ isOpen = true, toggleSidebar, isMobile, onCloseMobile }) => {
         { label: 'Customers', icon: Users, path: '/customers' },
         { label: 'Invoices', icon: FileText, path: '/invoices' },
         { label: 'Reports', icon: BarChart3, path: '/reports' },
+        { label: 'GST Reports', icon: FileText, path: '/gst-reports' },
         { label: 'Expenses', icon: Wallet, path: '/expenses' },
         { label: 'Settings', icon: Settings, path: '/settings' },
         { label: 'Barcode', icon: ScanBarcode, path: '/barcode' },
@@ -41,7 +42,7 @@ const Sidebar = ({ isOpen = true, toggleSidebar, isMobile, onCloseMobile }) => {
     const userInitials = userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
 
     return (
-        <div className="flex h-full w-full flex-col border-r border-theme bg-card shadow-sm">
+        <div className="flex h-full w-full flex-col border-r border-black bg-white shadow-sm">
             {/* Logo Area */}
             {/* Logo Area */}
             <div className={cn("flex h-16 items-center border-b border-theme transition-all", isOpen ? "justify-between px-4" : "justify-center px-0")}>
@@ -54,7 +55,7 @@ const Sidebar = ({ isOpen = true, toggleSidebar, isMobile, onCloseMobile }) => {
                         <Receipt size={20} strokeWidth={2.5} />
                     </div>
                     {isOpen && (
-                        <span className="text-xl font-bold text-body-primary tracking-tight">Zilling</span>
+                        <span className="text-xl font-bold text-body-primary tracking-tight">KWIQBILL</span>
                     )}
                 </div>
                 {/* Mobile Close Toggle */}

@@ -10,7 +10,22 @@ const path = require("path");
  * @param {string} options.userBaseDir  - base user directory
  * @param {Function} [options.map]  - optional row transformer
  */
-function syncTableToJson({ db, table, userBaseDir, map }) {
+const { performBackup } = require("../services/backupService");
+
+// Debounce Map: userId -> timeoutId
+const debounceMap = new Map();
+
+/**
+ * Sync any SQLite table to a JSON file
+ *
+ * @param {Object} options
+ * @param {Object} options.db       - better-sqlite3 instance
+ * @param {string} options.table    - table name
+ * @param {string} options.userBaseDir  - base user directory
+ * @param {Function} [options.map]  - optional row transformer
+ * @param {string} [options.userId] - Google User ID (for backup trigger)
+ */
+function syncTableToJson({ db, table, userBaseDir, map, userId }) {
   const dataDir = path.join(userBaseDir, "data", table);
 
   fs.mkdirSync(dataDir, { recursive: true });
@@ -30,6 +45,36 @@ function syncTableToJson({ db, table, userBaseDir, map }) {
   );
 
   console.log(`🔄 Synced ${table} → ${filePath}`);
+
+  // ☁️ Trigger Cloud Backup (Debounced 30s)
+  if (userId) {
+    if (debounceMap.has(userId)) {
+      clearTimeout(debounceMap.get(userId));
+    }
+
+    const timeoutId = setTimeout(() => {
+      // 🛡️ Check Settings before Backup
+      try {
+        const settingsRow = db.prepare(`SELECT data FROM settings WHERE id = 'singleton'`).get();
+        const settings = settingsRow ? JSON.parse(settingsRow.data) : {};
+
+        if (!settings.backup?.enabled) {
+          console.log("☁️  Auto-Backup Skipped: Feature Disabled in Settings");
+          return;
+        }
+
+        performBackup(userId, userBaseDir).then(res => {
+          if (res.success) console.log("☁️  Auto-Backup Success");
+          else console.log("⚠️ Auto-Backup Skipped/Failed (Auth likely needed)");
+        });
+      } catch (err) {
+        console.error("Backup trigger check failed:", err);
+      }
+      debounceMap.delete(userId);
+    }, 30000); // 30 seconds debounce
+
+    debounceMap.set(userId, timeoutId);
+  }
 }
 
 module.exports = { syncTableToJson };

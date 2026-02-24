@@ -5,7 +5,8 @@ const keytar = require("keytar");
 
 const SERVICE = "BillingSoftware";
 
-async function openUserDatabase(googleSub) {
+async function openUserDatabase(rawGoogleSub) {
+  const googleSub = String(rawGoogleSub); // 🔑 Ensure string
   const baseDir = path.join(
     require("os").homedir(),
     "Documents",
@@ -18,10 +19,20 @@ async function openUserDatabase(googleSub) {
 
   const dbPath = path.join(baseDir, "db", "billing.db");
 
-  let key = await keytar.getPassword(SERVICE, googleSub);
-  if (!key) {
-    key = require("crypto").randomBytes(32).toString("hex");
-    await keytar.setPassword(SERVICE, googleSub, key);
+  let key;
+  try {
+    key = await keytar.getPassword(SERVICE, googleSub);
+    if (!key) {
+      key = require("crypto").randomBytes(32).toString("hex");
+      await keytar.setPassword(SERVICE, googleSub, key);
+    }
+    console.log(`🔐 Database key loaded for ${googleSub}`);
+  } catch (err) {
+    console.warn("⚠️ Keytar failed (native module issue), using fallback key derivation:", err.message);
+    // Fallback: Derive a deterministic key from googleSub and Service Name
+    // This is less secure than system keychain but functional for local app
+    const output = require("crypto").createHash("sha256").update(`${SERVICE}-${googleSub}`).digest("hex");
+    key = output;
   }
 
   const db = new Database(dbPath);

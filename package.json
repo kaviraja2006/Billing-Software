@@ -1,5 +1,5 @@
 {
-  "name": "billing-software",
+  "name": "kwiqbill",
   "version": "1.0.0",
   "description": "Billing Software Desktop Application",
   "author": "Your Name",
@@ -13,7 +13,7 @@
     "dist": "npm run build:frontend && electron-builder"
   },
   "dependencies": {
-    "axios": "^1.13.2",
+    "axios": "^1.13.3",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.6.2",
     "cloudinary": "^1.41.3",
@@ -21,8 +21,10 @@
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
     "express-async-handler": "^1.2.0",
-    "fs-extra": "^11.3.3",
+    "express-rate-limit": "^8.2.1",
+    "express-session": "^1.18.2",
     "google-auth-library": "^10.5.0",
+    "googleapis": "^170.1.0",
     "helmet": "^8.1.0",
     "joi": "^18.0.2",
     "jsonwebtoken": "^9.0.3",
@@ -33,6 +35,7 @@
     "multer-storage-cloudinary": "^4.0.0",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
+    "schedular": "^0.0.1",
     "sharp": "^0.32.1",
     "uuid": "^13.0.0"
   },
@@ -45,7 +48,7 @@
   },
   "build": {
     "appId": "com.yourcompany.billing",
-    "productName": "Billing Software",
+    "productName": "Kwiqbill Billing Software",
     "asar": true,
     "npmRebuild": true,
     "directories": {
@@ -74,14 +77,26 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": "electron/icon.ico"
+      "icon": "buildResources/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "runAfterFinish": true,
+      "license": "buildResources/license.txt",
+      "deleteAppDataOnUninstall": false,
+      "include": "buildResources/installer.nsh"
     },
     "linux": {
       "target": [
         "AppImage",
         "deb"
       ],
-      "icon": "electron/icons",
+      "icon": "buildResources/icons",
       "category": "Office"
     }
   }

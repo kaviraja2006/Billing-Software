@@ -22,6 +22,7 @@ const Modal = ({ isOpen, onClose, title, children, className, size = 'md' }) => 
         md: 'max-w-xl',
         lg: 'max-w-3xl',
         xl: 'max-w-5xl',
+        '4xl': 'max-w-7xl',
         full: 'max-w-full m-4',
     };
 
@@ -35,7 +36,7 @@ const Modal = ({ isOpen, onClose, title, children, className, size = 'md' }) => 
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={onClose}
-                        className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
+                        className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
                     />
 
                     {/* Modal Content */}

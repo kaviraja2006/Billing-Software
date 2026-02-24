@@ -18,21 +18,34 @@ exports.createCustomer = async (req, res, next) => {
       source = "Walk-in",
       tags = [],
       loyaltyPoints = 0,
+      whatsappOptIn = false,
+      smsOptIn = false,
       notes = "",
     } = req.body;
 
-    const [firstName, ...rest] = fullName.trim().split(" ");
+    // Validate phone
+    if (!phone || phone.trim() === "") {
+      return res.status(400).json({ message: "Phone number is required" });
+    }
+
+    // Check for duplicate phone
+    const existingCustomer = db.prepare("SELECT id FROM customers WHERE phone = ?").get(phone);
+    if (existingCustomer) {
+      return res.status(409).json({ message: "Customer with this phone number already exists", customerId: existingCustomer.id });
+    }
+
+    const [firstName, ...rest] = (fullName || "").trim().split(" ");
     const lastName = rest.join(" ");
 
     const result = db.prepare(`
       INSERT INTO customers (
         firstName, lastName, phone, email,
         customerType, gstin, address,
-        source, tags, loyaltyPoints, notes,
+        source, tags, loyaltyPoints, whatsappOptIn, smsOptIn, notes,
         createdAt
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
     `).run(
-      firstName,
+      firstName || "Customer",
       lastName,
       phone,
       email,
@@ -42,6 +55,8 @@ exports.createCustomer = async (req, res, next) => {
       source,
       JSON.stringify(tags),
       loyaltyPoints,
+      whatsappOptIn ? 1 : 0,
+      smsOptIn ? 1 : 0,
       notes
     );
 
@@ -53,7 +68,9 @@ exports.createCustomer = async (req, res, next) => {
       ...newCustomer,
       address: JSON.parse(newCustomer.address || "{}"),
       tags: JSON.parse(newCustomer.tags || "[]"),
-      fullName: `${newCustomer.firstName} ${newCustomer.lastName}`.trim()
+      fullName: `${newCustomer.firstName} ${newCustomer.lastName}`.trim(),
+      whatsappOptIn: Boolean(newCustomer.whatsappOptIn),
+      smsOptIn: Boolean(newCustomer.smsOptIn)
     };
 
     // 🔄 AUTO SYNC
@@ -65,8 +82,11 @@ exports.createCustomer = async (req, res, next) => {
         ...c,
         address: JSON.parse(c.address || "{}"),
         tags: JSON.parse(c.tags || "[]"),
-        fullName: `${c.firstName} ${c.lastName}`.trim()
-      })
+        fullName: `${c.firstName} ${c.lastName}`.trim(),
+        whatsappOptIn: Boolean(c.whatsappOptIn),
+        smsOptIn: Boolean(c.smsOptIn)
+      }),
+      userId: req.user.googleSub
     });
 
     res.status(201).json(formattedCustomer);
@@ -77,55 +97,86 @@ exports.createCustomer = async (req, res, next) => {
 };
 // GET ALL CUSTOMERS
 // ------------------------------------
-exports.getCustomers = async (req, res) => {
-  const db = await withDB(req);
+exports.getCustomers = async (req, res, next) => {
+  try {
+    const db = await withDB(req);
 
-  const rows = db.prepare(`SELECT * FROM customers`).all();
+    const rows = db.prepare(`
+      SELECT c.*,
+        (SELECT COUNT(*) FROM invoices WHERE customer_id = c.id) as totalVisits,
+        (SELECT COALESCE(SUM(total), 0) FROM invoices WHERE customer_id = c.id) as totalSpent,
+        (
+          SELECT COALESCE(SUM(
+            total - COALESCE((
+              SELECT SUM(CAST(json_extract(value, '$.amount') AS REAL))
+              FROM json_each(invoices.payments)
+            ), 0)
+          ), 0)
+          FROM invoices
+          WHERE customer_id = c.id AND status != 'Paid'
+        ) as due
+      FROM customers c
+      ORDER BY c.createdAt DESC
+    `).all();
 
-  const customers = rows.map(c => ({
-    ...c,
-    tags: c.tags ? JSON.parse(c.tags) : [],
-    address: c.address ? JSON.parse(c.address) : {},
-    fullName: `${c.firstName} ${c.lastName || ""}`.trim(),
-  }));
+    const customers = rows.map(c => ({
+      ...c,
+      tags: c.tags ? JSON.parse(c.tags) : [],
+      address: c.address ? JSON.parse(c.address) : {},
+      fullName: `${c.firstName} ${c.lastName || ""}`.trim(),
+    }));
 
-  res.json(customers);
+    res.json(customers);
+  } catch (error) {
+    console.error('Error in getCustomers:', error);
+    next(error);
+  }
 };
 
 // ------------------------------------
 // DELETE CUSTOMER
 // ------------------------------------
-exports.deleteCustomer = async (req, res) => {
-  const db = await withDB(req);
-  db.prepare(`DELETE FROM customers WHERE id = ?`).run(req.params.id);
-  res.json({ success: true });
+exports.deleteCustomer = async (req, res, next) => {
+  try {
+    const db = await withDB(req);
+    db.prepare(`DELETE FROM customers WHERE id = ?`).run(req.params.id);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error in deleteCustomer:', error);
+    next(error);
+  }
 };
 
 // ------------------------------------
 // SEARCH DUPLICATES
 // ------------------------------------
-exports.searchDuplicates = async (req, res) => {
-  const { query } = req.query;
-  if (!query) return res.json([]);
+exports.searchDuplicates = async (req, res, next) => {
+  try {
+    const { query } = req.query;
+    if (!query) return res.json([]);
 
-  const db = await withDB(req);
+    const db = await withDB(req);
 
-  const rows = db.prepare(`
-    SELECT *
-    FROM customers
-    WHERE phone LIKE ?
-       OR email LIKE ?
-    LIMIT 5
-  `).all(`%${query}%`, `%${query}%`);
+    const rows = db.prepare(`
+      SELECT *
+      FROM customers
+      WHERE phone LIKE ?
+         OR email LIKE ?
+      LIMIT 5
+    `).all(`%${query}%`, `%${query}%`);
 
-  const results = rows.map(c => ({
-    ...c,
-    tags: c.tags ? JSON.parse(c.tags) : [],
-    address: c.address ? JSON.parse(c.address) : {},
-    fullName: `${c.firstName} ${c.lastName || ""}`.trim(),
-  }));
+    const results = rows.map(c => ({
+      ...c,
+      tags: c.tags ? JSON.parse(c.tags) : [],
+      address: c.address ? JSON.parse(c.address) : {},
+      fullName: `${c.firstName} ${c.lastName || ""}`.trim(),
+    }));
 
-  res.json(results);
+    res.json(results);
+  } catch (error) {
+    console.error('Error in searchDuplicates:', error);
+    next(error);
+  }
 };
 
 // ------------------------------------
@@ -134,7 +185,23 @@ exports.searchDuplicates = async (req, res) => {
 exports.getCustomerById = async (req, res, next) => {
   try {
     const db = await withDB(req);
-    const customer = db.prepare(`SELECT * FROM customers WHERE id = ?`).get(req.params.id);
+    const customer = db.prepare(`
+      SELECT c.*,
+        (SELECT COUNT(*) FROM invoices WHERE customer_id = c.id) as totalVisits,
+        (SELECT COALESCE(SUM(total), 0) FROM invoices WHERE customer_id = c.id) as totalSpent,
+        (
+          SELECT COALESCE(SUM(
+            total - COALESCE((
+              SELECT SUM(CAST(json_extract(value, '$.amount') AS REAL))
+              FROM json_each(invoices.payments)
+            ), 0)
+          ), 0)
+          FROM invoices
+          WHERE customer_id = c.id AND status != 'Paid'
+        ) as due
+      FROM customers c
+      WHERE c.id = ?
+    `).get(req.params.id);
 
     if (!customer) {
       return res.status(404).json({ message: "Customer not found" });
@@ -198,7 +265,23 @@ exports.updateCustomer = async (req, res, next) => {
     );
 
     // Get the updated customer
-    const updatedCustomer = db.prepare(`SELECT * FROM customers WHERE id = ?`).get(req.params.id);
+    const updatedCustomer = db.prepare(`
+      SELECT c.*,
+        (SELECT COUNT(*) FROM invoices WHERE customer_id = c.id) as totalVisits,
+        (SELECT COALESCE(SUM(total), 0) FROM invoices WHERE customer_id = c.id) as totalSpent,
+        (
+          SELECT COALESCE(SUM(
+            total - COALESCE((
+              SELECT SUM(CAST(json_extract(value, '$.amount') AS REAL))
+              FROM json_each(invoices.payments)
+            ), 0)
+          ), 0)
+          FROM invoices
+          WHERE customer_id = c.id AND status != 'Paid'
+        ) as due
+      FROM customers c
+      WHERE c.id = ?
+    `).get(req.params.id);
 
     const formattedCustomer = {
       ...updatedCustomer,
@@ -217,7 +300,8 @@ exports.updateCustomer = async (req, res, next) => {
         address: JSON.parse(c.address || "{}"),
         tags: JSON.parse(c.tags || "[]"),
         fullName: `${c.firstName} ${c.lastName}`.trim()
-      })
+      }),
+      userId: req.user.googleSub
     });
 
     res.json(formattedCustomer);
@@ -227,3 +311,149 @@ exports.updateCustomer = async (req, res, next) => {
   }
 };
 
+// ------------------------------------
+// GET CUSTOMER BY MOBILE
+// ------------------------------------
+exports.getCustomerByMobile = async (req, res, next) => {
+  try {
+    const db = await withDB(req);
+    const { mobile } = req.params;
+
+    if (!mobile) {
+      return res.status(400).json({ message: "Mobile number is required" });
+    }
+
+    const customer = db.prepare(`
+      SELECT c.*,
+        (SELECT COUNT(*) FROM invoices WHERE customer_id = c.id) as totalVisits,
+        (SELECT COALESCE(SUM(total), 0) FROM invoices WHERE customer_id = c.id) as totalSpent,
+        (
+          SELECT COALESCE(SUM(
+            total - COALESCE((
+              SELECT SUM(CAST(json_extract(value, '$.amount') AS REAL))
+              FROM json_each(invoices.payments)
+            ), 0)
+          ), 0)
+          FROM invoices
+          WHERE customer_id = c.id AND status != 'Paid'
+        ) as due
+      FROM customers c
+      WHERE c.phone = ?
+    `).get(mobile);
+
+    if (!customer) {
+      return res.status(404).json({ message: "Customer not found" });
+    }
+
+    const formattedCustomer = {
+      ...customer,
+      tags: customer.tags ? JSON.parse(customer.tags) : [],
+      address: customer.address ? JSON.parse(customer.address) : {},
+      fullName: `${customer.firstName} ${customer.lastName || ""}`.trim(),
+      whatsappOptIn: Boolean(customer.whatsappOptIn),
+      smsOptIn: Boolean(customer.smsOptIn)
+    };
+
+    res.json(formattedCustomer);
+  } catch (error) {
+    console.error('Error in getCustomerByMobile:', error);
+    next(error);
+  }
+};
+
+// ------------------------------------
+// FIND OR CREATE CUSTOMER (Silent)
+// ------------------------------------
+exports.findOrCreateCustomer = async (req, res, next) => {
+  try {
+    const db = await withDB(req);
+    const {
+      mobile,
+      name = "",
+      whatsappOptIn = false,
+      smsOptIn = false,
+      gstin = "",
+      address = {},
+      source = "POS"
+    } = req.body;
+
+    if (!mobile || mobile.trim() === "") {
+      return res.status(400).json({ message: "Mobile number is required" });
+    }
+
+    // Try to find existing customer
+    const existingCustomer = db.prepare("SELECT * FROM customers WHERE phone = ?").get(mobile);
+
+    if (existingCustomer) {
+      // Return existing customer
+      const formattedCustomer = {
+        ...existingCustomer,
+        tags: JSON.parse(existingCustomer.tags || "[]"),
+        address: JSON.parse(existingCustomer.address || "{}"),
+        fullName: `${existingCustomer.firstName} ${existingCustomer.lastName || ""}`.trim(),
+        whatsappOptIn: Boolean(existingCustomer.whatsappOptIn),
+        smsOptIn: Boolean(existingCustomer.smsOptIn)
+      };
+      return res.json({ ...formattedCustomer, isNew: false });
+    }
+
+    // Create new customer
+    const [firstName, ...rest] = (name || "").trim().split(" ");
+    const lastName = rest.join(" ");
+
+    const result = db.prepare(`
+      INSERT INTO customers (
+        firstName, lastName, phone, email,
+        customerType, gstin, address,
+        source, tags, loyaltyPoints, whatsappOptIn, smsOptIn, notes,
+        createdAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    `).run(
+      firstName || "Customer",
+      lastName,
+      mobile,
+      "",
+      "Individual",
+      gstin,
+      JSON.stringify(address),
+      source,
+      JSON.stringify([]),
+      0,
+      whatsappOptIn ? 1 : 0,
+      smsOptIn ? 1 : 0,
+      ""
+    );
+
+    const newCustomer = db.prepare("SELECT * FROM customers WHERE id = ?").get(result.lastInsertRowid);
+
+    const formattedCustomer = {
+      ...newCustomer,
+      tags: JSON.parse(newCustomer.tags || "[]"),
+      address: JSON.parse(newCustomer.address || "{}"),
+      fullName: `${newCustomer.firstName} ${newCustomer.lastName}`.trim(),
+      whatsappOptIn: Boolean(newCustomer.whatsappOptIn),
+      smsOptIn: Boolean(newCustomer.smsOptIn)
+    };
+
+    // 🔄 AUTO SYNC
+    syncTableToJson({
+      db,
+      table: "customers",
+      userBaseDir: req.userBaseDir,
+      map: c => ({
+        ...c,
+        address: JSON.parse(c.address || "{}"),
+        tags: JSON.parse(c.tags || "[]"),
+        fullName: `${c.firstName} ${c.lastName}`.trim(),
+        whatsappOptIn: Boolean(c.whatsappOptIn),
+        smsOptIn: Boolean(c.smsOptIn)
+      }),
+      userId: req.user.googleSub
+    });
+
+    res.status(201).json({ ...formattedCustomer, isNew: true });
+  } catch (error) {
+    console.error('Error in findOrCreateCustomer:', error);
+    next(error);
+  }
+};

@@ -3,42 +3,47 @@
 :root {
   --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 
-  /* Strict Professional Theme (Trust & Finance) */
+  /* Modern Premium Monochrome Theme (Zinc/Neutral) */
 
   /* Core Colors */
-  --color-primary: #1E3A8A;
-  /* Deep Navy Blue */
-  --color-primary-hover: #1D4ED8;
-  /* Royal Blue */
+  --color-primary: #18181b;
+  /* Zinc 950 - Softer, deep black */
+  --color-primary-hover: #27272a;
+  /* Zinc 800 */
 
-  --color-bg-app: #F8FAFC;
-  /* Very Light Grey (Main App Area) */
-  --color-bg-card: #FFFFFF;
-  /* White (Cards / Tables) */
+  --color-bg-app: #fafafa;
+  /* Zinc 50 - Premium off-white */
+  --color-bg-card: #ffffff;
+  /* Pure White */
 
-  --color-border: #CBD5E1;
-  /* Slate 300 (Borders) */
+  --color-border: #e4e4e7;
+  /* Zinc 200 */
+  --color-border-hover: #d4d4d8;
+  /* Zinc 300 */
 
   /* Text Colors */
-  --color-text-primary: #0F172A;
-  /* Almost Black (Numbers, Data) */
-  --color-text-secondary: #475569;
-  /* Slate Grey (Labels) */
-  --color-text-muted: #94A3B8;
-  /* Disabled */
+  --color-text-primary: #09090b;
+  /* Zinc 950 */
+  --color-text-secondary: #52525b;
+  /* Zinc 600 */
+  --color-text-muted: #a1a1aa;
+  /* Zinc 400 */
 
-  /* Status Colors */
-  --color-success: #16A34A;
-  /* Green */
-  --color-warning: #F59E0B;
-  /* Amber */
-  --color-danger: #DC2626;
-  /* Red (Alerts Only) */
+  /* Status Colors (Monochrome Interpretation) */
+  --color-success: #18181b;
+  /* Zinc 950 */
+  --color-warning: #52525b;
+  /* Zinc 600 */
+  --color-danger: #18181b;
+  /* Zinc 950 */
 
   /* Tables */
-  --color-table-header: #E2E8F0;
-  --color-table-row-hover: #F1F5F9;
-  --color-table-border: #CBD5E1;
+  --color-table-header: #f4f4f5;
+  /* Zinc 100 */
+  --color-table-row-hover: #fafafa;
+  /* Zinc 50 */
+  --color-table-border: #e4e4e7;
+  /* Zinc 200 */
 }
 
 body {
@@ -47,6 +52,7 @@ body {
   color: var(--color-text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  margin: 0;
 }
 
 /* Ensure form elements inherit the font */
@@ -61,14 +67,23 @@ textarea {
 }
 
 /* Custom Utilities for Scrollbars */
-.scrollbar-hide::-webkit-scrollbar {
+.scrollbar-hide::-webkit-scrollbar,
+.no-scrollbar::-webkit-scrollbar {
   display: none;
 }
 
-.scrollbar-hide {
+.scrollbar-hide,
+.no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+@layer base {
+  body {
+    @apply m-0;
+  }
+}
+
 
 /* Utility classes for using the variables with Tailwind */
 @layer utilities {
@@ -107,18 +122,19 @@ textarea {
   .border-theme {
     border-color: var(--color-border);
   }
-  
+
   @keyframes slide-in-right {
     from {
       transform: translateX(100%);
       opacity: 0;
     }
+
     to {
       transform: translateX(0);
       opacity: 1;
     }
   }
-  
+
   .animate-slide-in-right {
     animation: slide-in-right 0.3s ease-out;
   }

@@ -1,0 +1,18 @@
+END-USER LICENSE AGREEMENT (EULA) FOR KWIQBILL
+
+IMPORTANT-READ CAREFULLY: This End-User License Agreement ("EULA") is a legal agreement between you (either an individual or a single entity) and the Kwiqbill developer(s) for the Kwiqbill software product identified above, which includes computer software and may include associated media, printed materials, and "online" or electronic documentation ("SOFTWARE PRODUCT").
+
+1. GRANT OF LICENSE. This EULA grants you the right to install and use the SOFTWARE PRODUCT on a single computer or network, subject to the conditions of your purchase or subscription.
+
+2. DESCRIPTION OF OTHER RIGHTS AND LIMITATIONS.
+   - You may not reverse engineer, decompile, or disassemble the SOFTWARE PRODUCT.
+   - The SOFTWARE PRODUCT is licensed as a single product. Its component parts may not be separated for use on more than one computer.
+   - You may not rent, lease, or lend the SOFTWARE PRODUCT.
+
+3. DATA RETENTION. The SOFTWARE PRODUCT stores your data locally in the %APPDATA%\Kwiqbill directory. By default, uninstallation will not delete this data to prevent accidental data loss.
+
+4. COPYRIGHT. All title and copyrights in and to the SOFTWARE PRODUCT are owned by the Kwiqbill developer(s).
+
+5. NO WARRANTIES. The Kwiqbill developer(s) expressly disclaim any warranty for the SOFTWARE PRODUCT.
+
+By installing, copying, or otherwise using the SOFTWARE PRODUCT, you agree to be bound by the terms of this EULA.
