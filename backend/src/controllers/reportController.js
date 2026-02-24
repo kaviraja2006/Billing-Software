@@ -7,70 +7,119 @@ exports.getDashboardStats = async (req, res) => {
   const db = await withDB(req);
   const { startDate, endDate } = req.query;
 
-  // Helper to build date clause
-  const buildParams = (dateCol) => {
-    const conditions = [];
-    const args = [];
-    if (startDate) {
-      conditions.push(`date(${dateCol}) >= date(?)`);
-      args.push(startDate);
-    }
-    if (endDate) {
-      conditions.push(`date(${dateCol}) <= date(?)`);
-      args.push(endDate);
-    }
-    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-    return { where, args };
+  // Helper to fetch stats for a specific range
+  const fetchPeriodStats = (start, end) => {
+    // 1. Sales & Orders
+    const salesStats = db.prepare(`
+      SELECT 
+        COALESCE(SUM(total), 0) as sales, 
+        COALESCE(SUM(total_cost), 0) as cogs,
+        COALESCE(SUM(discount), 0) as discounts,
+        COUNT(*) as orders 
+      FROM invoices 
+      WHERE date >= ? AND date <= ?
+    `).get(start, end);
+
+    // 2. Expenses
+    const expenseStats = db.prepare(`
+        SELECT COALESCE(SUM(amount), 0) as total 
+        FROM expenses 
+        WHERE date >= ? AND date <= ?
+    `).get(start, end);
+
+    const sales = salesStats.sales || 0;
+    const cogs = salesStats.cogs || 0;
+    const orders = salesStats.orders || 0;
+    const discounts = salesStats.discounts || 0;
+    const expenses = expenseStats.total || 0;
+
+    const grossProfit = sales - cogs;
+    const netProfit = grossProfit - expenses;
+    const aov = orders > 0 ? (sales / orders) : 0;
+
+    return { sales, orders, expenses, netProfit, aov, grossProfit, discounts };
   };
 
-  // 1. Sales & Orders
-  const inv = buildParams('date');
-  const salesStats = db.prepare(`
-    SELECT 
-      COALESCE(SUM(total), 0) as sales, 
-      COUNT(*) as orders 
-    FROM invoices 
-    ${inv.where}
-  `).get(...inv.args);
+  // Current Period
+  const current = fetchPeriodStats(startDate, endDate);
 
-  const sales = salesStats.sales || 0;
-  const orders = salesStats.orders || 0;
-  const aov = orders > 0 ? (sales / orders) : 0;
+  // Previous Period Calculation
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const duration = end.getTime() - start.getTime();
 
-  // 2. Expenses
-  const exp = buildParams('date');
-  const expenses = db.prepare(`
-    SELECT COALESCE(SUM(amount), 0) as total 
-    FROM expenses 
-    ${exp.where}
-  `).get(...exp.args).total || 0;
+  const prevEnd = new Date(start.getTime() - 1); // 1ms before current start
+  const prevStart = new Date(prevEnd.getTime() - duration);
 
-  // 3. Profit
-  const netProfit = sales - expenses;
+  const prevStats = fetchPeriodStats(prevStart.toISOString(), prevEnd.toISOString());
 
-  // 4. Counts
+  // Helper for % change
+  const calcChange = (curr, prev) => {
+    if (prev === 0) return null; // Return null to indicate no prior data
+    return ((curr - prev) / prev) * 100;
+  };
+
+  // Counts (Snapshot, not period change usually)
   const totalCustomers = db.prepare(`SELECT COUNT(*) as count FROM customers`).get().count || 0;
-
   const pendingInvoices = db.prepare(`
     SELECT COUNT(*) as count FROM invoices WHERE status = 'Unpaid' OR status = 'Pending'
   `).get().count || 0;
 
-  // Return structure supporting BOTH Dashboard.jsx (flat) and ReportsPage.jsx (nested)
-  res.json({
-    // New Structure
-    sales: { value: sales, prev: 0, change: 0, sparkline: [] },
-    orders: { value: orders, prev: 0, change: 0 },
-    expenses: { value: expenses, prev: 0, change: 0 },
-    netProfit: { value: netProfit, prev: 0, change: 0 },
-    aov: { value: aov, prev: 0, change: 0 },
+  // Margins (Current)
+  const grossMargin = current.sales > 0 ? (current.grossProfit / current.sales) * 100 : 0;
+  const netMargin = current.sales > 0 ? (current.netProfit / current.sales) * 100 : 0;
 
-    // Legacy Structure (for Dashboard.jsx)
-    totalSales: sales,
-    totalOrders: orders,
-    totalCustomers: totalCustomers,
-    totalExpenses: expenses,
-    pendingInvoices: pendingInvoices,
-    trends: { sales: 0, orders: 0 } // Mock trends for Dashboard.jsx
+  // Margins (Previous)
+  const prevGrossMargin = prevStats.sales > 0 ? (prevStats.grossProfit / prevStats.sales) * 100 : 0;
+  const prevNetMargin = prevStats.sales > 0 ? (prevStats.netProfit / prevStats.sales) * 100 : 0;
+
+  res.json({
+    sales: {
+      value: current.sales,
+      prev: prevStats.sales,
+      change: calcChange(current.sales, prevStats.sales)
+    },
+    orders: {
+      value: current.orders,
+      prev: prevStats.orders,
+      change: calcChange(current.orders, prevStats.orders)
+    },
+    expenses: {
+      value: current.expenses,
+      prev: prevStats.expenses,
+      change: calcChange(current.expenses, prevStats.expenses)
+    },
+    netProfit: {
+      value: current.netProfit,
+      prev: prevStats.netProfit,
+      change: calcChange(current.netProfit, prevStats.netProfit)
+    },
+    discounts: {
+      value: current.discounts,
+      prev: prevStats.discounts,
+      change: calcChange(current.discounts, prevStats.discounts)
+    },
+    returns: {
+      value: 0, // Placeholder
+      prev: 0,
+      change: 0
+    },
+    margins: {
+      gross: { value: grossMargin, change: calcChange(grossMargin, prevGrossMargin) },
+      net: { value: netMargin, change: calcChange(netMargin, prevNetMargin) }
+    },
+    aov: {
+      value: current.aov,
+      prev: prevStats.aov,
+      change: calcChange(current.aov, prevStats.aov)
+    },
+
+    // Legacy (for backward compat if needed anywhere else, though Dashboard.jsx will use new structure)
+    totalSales: current.sales,
+    totalOrders: current.orders,
+    totalCustomers,
+    totalExpenses: current.expenses,
+    pendingInvoices
   });
 };
 
@@ -87,13 +136,13 @@ exports.getFinancials = async (req, res) => {
   const args = [];
 
   if (startDate) {
-    querySales += ` AND date(date) >= date(?)`;
-    queryExpenses += ` AND date(date) >= date(?)`;
+    querySales += ` AND date >= ?`;
+    queryExpenses += ` AND date >= ?`;
     args.push(startDate);
   }
   if (endDate) {
-    querySales += ` AND date(date) <= date(?)`;
-    queryExpenses += ` AND date(date) <= date(?)`;
+    querySales += ` AND date <= ?`;
+    queryExpenses += ` AND date <= ?`;
     args.push(endDate);
   }
 
@@ -111,8 +160,8 @@ exports.getFinancials = async (req, res) => {
 
   res.json({
     income,
-    expenses,
-    profit: income - expenses,
+    totalExpenses: expenses,
+    netProfit: income - expenses,
   });
 };
 
@@ -121,46 +170,93 @@ exports.getFinancials = async (req, res) => {
  */
 exports.getTopProducts = async (req, res) => {
   const db = await withDB(req);
-  const { startDate, endDate } = req.query;
+  const { startDate, endDate, groupBy = 'product' } = req.query;
+
+  // 1. Fetch current valid products with details
+  const activeProducts = db.prepare('SELECT id, name, category, brand FROM products').all();
+  const productMap = new Map();
+  activeProducts.forEach(p => productMap.set(p.id, {
+    name: p.name,
+    category: p.category || 'Uncategorized',
+    brand: p.brand || 'No Brand'
+  }));
 
   let query = `SELECT items FROM invoices WHERE 1=1`;
   const params = [];
 
   if (startDate) {
-    query += ` AND date(date) >= date(?)`;
+    query += ` AND date >= ?`;
     params.push(startDate);
   }
   if (endDate) {
-    query += ` AND date(date) <= date(?)`;
+    query += ` AND date <= ?`;
     params.push(endDate);
   }
 
-  // Using JS aggregation to be safe with SQLite JSON nuances in this env
   const invoices = db.prepare(query).all(...params);
-
-  const productStats = {};
+  const statsMap = {};
 
   invoices.forEach(inv => {
     try {
       const items = JSON.parse(inv.items);
       if (Array.isArray(items)) {
         items.forEach(item => {
-          if (item.name) {
-            productStats[item.name] = (productStats[item.name] || 0) + (item.quantity || 0);
+          const pId = item.productId || item.id || item._id;
+
+          if (pId && productMap.has(pId)) {
+            const product = productMap.get(pId);
+
+            // Determine Group Key
+            let key = product.name; // default
+            if (groupBy === 'category') key = product.category;
+            else if (groupBy === 'brand') key = product.brand;
+
+            if (!statsMap[key]) {
+              statsMap[key] = {
+                quantity: 0,
+                revenue: 0,
+                cost: 0,
+                hasCostData: false
+              };
+            }
+
+            const qty = (parseFloat(item.quantity) || 0);
+            const rev = (parseFloat(item.total) || 0);
+
+            statsMap[key].quantity += qty;
+            statsMap[key].revenue += rev;
+
+            // Cost Calculation
+            if (item.costPrice !== undefined) {
+              const unitCost = parseFloat(item.costPrice) || 0;
+              statsMap[key].cost += (unitCost * qty);
+              statsMap[key].hasCostData = true;
+            }
           }
         });
       }
-    } catch (e) {
-      // ignore parse errors
-    }
+    } catch (e) { }
   });
 
-  const sortedProducts = Object.entries(productStats)
-    .map(([name, quantity]) => ({ name, quantity }))
-    .sort((a, b) => b.quantity - a.quantity)
-    .slice(0, 5);
+  const sortedResults = Object.entries(statsMap)
+    .map(([name, stats]) => {
+      let marginPercent = 0;
+      if (stats.hasCostData && stats.revenue > 0) {
+        const profit = stats.revenue - stats.cost;
+        marginPercent = (profit / stats.revenue) * 100;
+      }
 
-  res.json(sortedProducts);
+      return {
+        name,
+        quantity: stats.quantity,
+        revenue: stats.revenue,
+        marginPercent
+      };
+    })
+    .sort((a, b) => b.revenue - a.revenue) // Sort by revenue by default for top lists
+    .slice(0, 10); // increased limit slightly
+
+  res.json(sortedResults);
 };
 
 exports.getPaymentMethods = async (req, res) => {
@@ -171,11 +267,11 @@ exports.getPaymentMethods = async (req, res) => {
   const params = [];
 
   if (startDate) {
-    query += ` AND date(date) >= date(?)`;
+    query += ` AND date >= ?`;
     params.push(startDate);
   }
   if (endDate) {
-    query += ` AND date(date) <= date(?)`;
+    query += ` AND date <= ?`;
     params.push(endDate);
   }
 
@@ -187,8 +283,8 @@ exports.getPaymentMethods = async (req, res) => {
       const payments = JSON.parse(inv.payments);
       if (Array.isArray(payments)) {
         payments.forEach(p => {
-          if (p.mode && p.amount) {
-            methodStats[p.mode] = (methodStats[p.mode] || 0) + parseFloat(p.amount);
+          if (p.method && p.amount) {
+            methodStats[p.method] = (methodStats[p.method] || 0) + parseFloat(p.amount);
           }
         });
       }
@@ -209,31 +305,53 @@ exports.getSalesTrend = async (req, res) => {
   const db = await withDB(req);
   const { startDate, endDate } = req.query;
 
-  let query = `SELECT date, total FROM invoices WHERE 1=1`;
+  let query = `SELECT date, total, 1 as count FROM invoices WHERE 1=1`;
   const params = [];
 
   if (startDate) {
-    query += ` AND date(date) >= date(?)`;
+    query += ` AND date >= ?`;
     params.push(startDate);
   }
   if (endDate) {
-    query += ` AND date(date) <= date(?)`;
+    query += ` AND date <= ?`;
     params.push(endDate);
   }
   query += ` ORDER BY date ASC`;
 
   const invoices = db.prepare(query).all(...params);
 
-  // Aggregate by day
+  // Determine Aggregation Level
+  let isHourly = false;
+  if (startDate && endDate) {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const durationHours = (end - start) / (1000 * 60 * 60);
+    if (durationHours <= 48) {
+      isHourly = true;
+    }
+  }
+
+  // Aggregate
   const trend = {};
 
   invoices.forEach(inv => {
-    const day = inv.date.split('T')[0]; // Simple YYYY-MM-DD extraction
-    trend[day] = (trend[day] || 0) + (inv.total || 0);
+    let key;
+    if (isHourly) {
+      // YYYY-MM-DDTHH:00:00.000Z format approx
+      const d = new Date(inv.date);
+      d.setMinutes(0, 0, 0);
+      key = d.toISOString(); // Keep ISO for consistency
+    } else {
+      key = inv.date.split('T')[0]; // Simple YYYY-MM-DD extraction
+    }
+    trend[key] = {
+      sales: (trend[key]?.sales || 0) + (inv.total || 0),
+      orders: (trend[key]?.orders || 0) + 1
+    };
   });
 
   const result = Object.entries(trend)
-    .map(([date, amount]) => ({ date, sales: amount }))
+    .map(([date, data]) => ({ date, sales: data.sales, orders: data.orders }))
     .sort((a, b) => a.date.localeCompare(b.date));
 
   res.json(result);
@@ -258,31 +376,34 @@ exports.getCustomerMetrics = async (req, res) => {
 
   // Returning customers (bought in period and has previous orders, or just > 1 order total?)
   // Let's go with: customers who bought in this period and have > 1 invoice total.
-  // First get customers who bought in period
-  let activeCustQuery = `SELECT DISTINCT customer_id FROM invoices WHERE 1=1`;
+  // Optimized Query:
+  let activeCustQuery = `SELECT customer_id FROM invoices WHERE 1=1`;
   const activeCustParams = [];
   if (startDate) {
-    activeCustQuery += ` AND date(date) >= date(?)`;
+    activeCustQuery += ` AND date >= ?`;
     activeCustParams.push(startDate);
   }
   if (endDate) {
-    activeCustQuery += ` AND date(date) <= date(?)`;
+    activeCustQuery += ` AND date <= ?`;
     activeCustParams.push(endDate);
   }
-  const activeCustomers = db.prepare(activeCustQuery).all(...activeCustParams).map(c => c.customer_id);
+
+  // Get unique customers active in this period
+  const activeCustomers = db.prepare(`SELECT DISTINCT customer_id FROM (${activeCustQuery})`).all(...activeCustParams).map(c => c.customer_id);
 
   let returningCustomers = 0;
   if (activeCustomers.length > 0) {
     const placeholders = activeCustomers.map(() => '?').join(',');
     // Check which of these have > 1 invoice
-    const returningCount = db.prepare(`
-      SELECT COUNT(DISTINCT customer_id) as count 
+    // We only need count, faster to group
+    const returningRows = db.prepare(`
+      SELECT customer_id 
       FROM invoices 
       WHERE customer_id IN (${placeholders}) 
       GROUP BY customer_id 
       HAVING COUNT(*) > 1
-    `).all(...activeCustomers).length;
-    returningCustomers = returningCount;
+    `).all(...activeCustomers);
+    returningCustomers = returningRows.length;
   }
 
   const totalActive = activeCustomers.length;

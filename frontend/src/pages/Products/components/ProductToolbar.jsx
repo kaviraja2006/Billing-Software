@@ -10,6 +10,8 @@ const ProductToolbar = ({
     onCategoryChange,
     brandFilter,
     onBrandChange,
+    timeFilter,
+    onTimeFilterChange,
     categories = [],
     brands = [],
     viewMode,
@@ -36,7 +38,7 @@ const ProductToolbar = ({
 
                 {/* Category Filter */}
                 <select
-                    className="h-10 px-3 rounded-md border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 min-w-[140px]"
+                    className="h-10 px-3 rounded-md border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-black min-w-[140px]"
                     value={categoryFilter || ''}
                     onChange={(e) => onCategoryChange(e.target.value || null)}
                 >
@@ -48,7 +50,7 @@ const ProductToolbar = ({
 
                 {/* Brand Filter */}
                 <select
-                    className="h-10 px-3 rounded-md border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 min-w-[140px]"
+                    className="h-10 px-3 rounded-md border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-black min-w-[140px]"
                     value={brandFilter || ''}
                     onChange={(e) => onBrandChange(e.target.value || null)}
                 >
@@ -58,20 +60,32 @@ const ProductToolbar = ({
                     ))}
                 </select>
 
+                {/* Time Period Filter */}
+                <select
+                    className="h-10 px-3 rounded-md border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-black min-w-[140px]"
+                    value={timeFilter || 'all'}
+                    onChange={(e) => onTimeFilterChange(e.target.value)}
+                >
+                    <option value="all">All Time</option>
+                    <option value="today">Today</option>
+                    <option value="week">This Week</option>
+                    <option value="month">This Month</option>
+                </select>
+
                 <div className="h-6 w-px bg-slate-200 mx-1 hidden md:block" />
 
                 {/* Density Toggle */}
                 <div className="flex bg-slate-100 rounded-lg p-1 border border-slate-200">
                     <button
                         onClick={() => onViewModeChange('compact')}
-                        className={`p-1.5 rounded-md transition-all ${viewMode === 'compact' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+                        className={`p-1.5 rounded-md transition-all ${viewMode === 'compact' ? 'bg-white shadow-sm text-black' : 'text-slate-500 hover:text-slate-700'}`}
                         title="Compact View"
                     >
                         <AlignJustify size={16} />
                     </button>
                     <button
                         onClick={() => onViewModeChange('comfortable')}
-                        className={`p-1.5 rounded-md transition-all ${viewMode === 'comfortable' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+                        className={`p-1.5 rounded-md transition-all ${viewMode === 'comfortable' ? 'bg-white shadow-sm text-black' : 'text-slate-500 hover:text-slate-700'}`}
                         title="Comfortable View"
                     >
                         <LayoutList size={16} />

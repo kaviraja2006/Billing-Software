@@ -4,6 +4,7 @@ import { Input } from '../../../components/ui/Input';
 import { Button } from '../../../components/ui/Button';
 import { Search, UserPlus } from 'lucide-react';
 import { useCustomers } from '../../../context/CustomerContext';
+import { isSearchMatch } from '../../../utils/searchUtils';
 
 const CustomerSearchModal = ({ isOpen, onClose, onSelect }) => {
     const { customers } = useCustomers();
@@ -18,8 +19,7 @@ const CustomerSearchModal = ({ isOpen, onClose, onSelect }) => {
 
     const filteredCustomers = customers.filter(customer => {
         const fullName = customer.fullName || `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || customer.name || '';
-        return fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (customer.phone && customer.phone.includes(searchTerm));
+        return isSearchMatch(fullName, searchTerm) || isSearchMatch(customer.phone, searchTerm);
     }).slice(0, 10);
 
     const handleKeyDown = (e, customer) => {
@@ -49,19 +49,6 @@ const CustomerSearchModal = ({ isOpen, onClose, onSelect }) => {
                 </div>
 
                 <div className="border rounded-md flex-1 overflow-y-auto">
-                    {/* Walk-in Option */}
-                    <div
-                        tabIndex={0}
-                        className="p-3 hover:bg-green-50 cursor-pointer border-b border-slate-100 bg-green-50/30 focus:bg-green-100 focus:outline-none"
-                        onClick={() => {
-                            onSelect({ name: 'Walk-in Customer', phone: '', email: '' });
-                            onClose();
-                        }}
-                    >
-                        <div className="font-semibold text-green-700">Walk-in Customer</div>
-                        <div className="text-xs text-green-600">Standard / Guest</div>
-                    </div>
-
                     {filteredCustomers.length > 0 ? (
                         filteredCustomers.map((customer, index) => (
                             <div

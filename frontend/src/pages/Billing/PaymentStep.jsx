@@ -9,10 +9,12 @@ import { Modal } from '../../components/ui/Modal';
 import { useTransactions } from '../../context/TransactionContext';
 import { useCustomers } from '../../context/CustomerContext';
 import { useProducts } from '../../context/ProductContext';
-import { printReceipt } from '../../utils/printerService';
+import { useSettings } from '../../context/SettingsContext';
+import { printReceipt } from '../../utils/printReceipt';
 
 const PaymentStep = ({ billingData, onComplete }) => {
     const { addTransaction } = useTransactions();
+    const { settings } = useSettings();
     const [method, setMethod] = useState('cash'); // cash, card, upi, split
     const [splitCash, setSplitCash] = useState('');
     const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
@@ -35,7 +37,7 @@ const PaymentStep = ({ billingData, onComplete }) => {
 
             const invoiceData = {
                 customerId: billingData.customer?.id || '',
-                customerName: billingData.customer?.name || 'Walk-in Customer',
+                customerName: billingData.customer?.fullName || billingData.customer?.name || '',
                 date: new Date(),
                 paymentMethod: methodStr,
                 items: billingData.cart.map(item => ({
@@ -77,7 +79,7 @@ const PaymentStep = ({ billingData, onComplete }) => {
 
     const handlePrint = () => {
         if (currentInvoice) {
-            printReceipt(currentInvoice);
+            printReceipt(currentInvoice, settings.invoice?.paperSize || '80mm', settings);
         }
     };
 

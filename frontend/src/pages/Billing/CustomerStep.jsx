@@ -5,6 +5,7 @@ import { Search, UserPlus, Phone, Mail, MapPin, User, CheckCircle2 } from 'lucid
 import { cn } from '../../lib/utils';
 import { Modal } from '../../components/ui/Modal';
 import { useCustomers } from '../../context/CustomerContext';
+import { isSearchMatch } from '../../utils/searchUtils';
 
 const CustomerStep = ({ billingData, setBillingData, onNext }) => {
     const { customers, addCustomer } = useCustomers();
@@ -15,8 +16,8 @@ const CustomerStep = ({ billingData, setBillingData, onNext }) => {
     const [newCustomer, setNewCustomer] = useState({ name: '', phone: '', email: '', address: '' });
 
     const filteredCustomers = customers.filter(c =>
-        c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.phone.includes(searchTerm)
+        isSearchMatch(c.name, searchTerm) ||
+        isSearchMatch(c.phone, searchTerm)
     );
 
     const handleSelectCustomer = (customer) => {

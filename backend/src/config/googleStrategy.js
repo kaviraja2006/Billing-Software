@@ -27,7 +27,7 @@ passport.use(
         const user = {
           name: profile.displayName || "Google User",
           email,
-          googleSub: profile.id, // 🔑 used for SQLite
+          googleSub: String(profile.id), // 🔑 Ensure string to prevent 21/22 digit mismatch
         };
 
         // 🔒 Securely store Refresh Token if provided
@@ -37,7 +37,7 @@ passport.use(
             await keytar.setPassword('BillingSoftware-Drive', profile.id, refreshToken);
             console.log("✅ Refresh Token securely stored for Drive access");
           } catch (keyErr) {
-            console.error("⚠️ Failed to store refresh token:", keyErr);
+            console.warn("⚠️ Keytar not available (native module), refresh token not stored:", keyErr.message);
           }
         } else {
           console.log("ℹ️ No refresh token received (user may have already consented)");

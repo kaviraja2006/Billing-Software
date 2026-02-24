@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback, useMemo } from 'react';
 import services from '../services/api';
 import { useAuth } from './AuthContext';
 
@@ -45,7 +45,7 @@ export const TransactionProvider = ({ children }) => {
         localStorage.setItem('heldBills', JSON.stringify(heldBills));
     }, [heldBills]);
 
-    const addTransaction = async (transactionData) => {
+    const addTransaction = useCallback(async (transactionData) => {
         try {
             const response = await services.billing.createInvoice(transactionData);
             const newTransaction = response.data;
@@ -55,9 +55,9 @@ export const TransactionProvider = ({ children }) => {
             console.error("Failed to add transaction", error);
             throw error;
         }
-    };
+    }, []);
 
-    const holdBill = (billData) => {
+    const holdBill = useCallback((billData) => {
         const heldBill = {
             id: `HOLD-${Date.now()}`,
             savedAt: new Date().toLocaleString(),
@@ -65,13 +65,13 @@ export const TransactionProvider = ({ children }) => {
         };
         setHeldBills(prev => [heldBill, ...prev]);
         return heldBill;
-    };
+    }, []);
 
-    const deleteHeldBill = (id) => {
+    const deleteHeldBill = useCallback((id) => {
         setHeldBills(prev => prev.filter(bill => bill.id !== id));
-    };
+    }, []);
 
-    const deleteTransaction = async (id) => {
+    const deleteTransaction = useCallback(async (id) => {
         try {
             await services.invoices.delete(id);
             setTransactions(prev => prev.filter(t => t.id !== id));
@@ -79,17 +79,19 @@ export const TransactionProvider = ({ children }) => {
             console.error("Failed to delete transaction", error);
             throw error;
         }
-    };
+    }, []);
+
+    const value = useMemo(() => ({
+        transactions,
+        addTransaction,
+        heldBills,
+        holdBill,
+        deleteHeldBill,
+        deleteTransaction
+    }), [transactions, addTransaction, heldBills, holdBill, deleteHeldBill, deleteTransaction]);
 
     return (
-        <TransactionContext.Provider value={{
-            transactions,
-            addTransaction,
-            heldBills,
-            holdBill,
-            deleteHeldBill,
-            deleteTransaction
-        }}>
+        <TransactionContext.Provider value={value}>
             {children}
         </TransactionContext.Provider>
     );
